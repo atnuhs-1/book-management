@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "formulahendry.auto-rename-tag",
+    "formulahendry.auto-close-tag",
+    "mhutchie.git-graph",
+    "anteprimorac.html-end-tag-labels",
+    "xabikos.JavaScriptSnippets",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "WollaceBuarque.tailwind-theme",
+    "dbaeumer.vscode-eslint"
+  ]
+}
