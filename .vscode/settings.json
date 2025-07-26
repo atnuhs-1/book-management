@@ -6,9 +6,9 @@
   "editor.formatOnPaste": true,                   // ペースト時に自動フォーマット
   "editor.formatOnType": false,                   // 入力時のフォーマット（無効推奨）
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,                 // 保存時にESLint自動修正
-    "source.organizeImports": true,               // import文の自動整理
-    "source.removeUnusedImports": true            // 未使用import削除
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit",
+    "source.removeUnusedImports": "explicit"
   },
   "editor.tabSize": 2,                           // インデント幅
   "editor.insertSpaces": true,                   // スペースでインデント
