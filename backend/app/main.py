@@ -1,14 +1,14 @@
 # backend/app/main.py
 
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
 from .google_books import fetch_book_info_by_isbn, search_books_by_title
-import os
 
 # 自作モジュールのインポート
-from . import models, schemas, crud
+from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 # 環境変数読み込み
@@ -71,3 +71,7 @@ def fetch_book(isbn: str):
 @app.get("/api/search_book")
 def search_book(title: str):
     return search_books_by_title(title)
+# usersテーブルの存在確認（GET）
+@app.get("/api/users/check")
+def check_users_table(db: Session = Depends(get_db)):
+    return crud.check_users_table_exists(db)
