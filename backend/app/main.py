@@ -4,6 +4,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from .google_books import fetch_book_info_by_isbn, search_books_by_title
 import os
 
 # 自作モジュールのインポート
@@ -57,3 +58,16 @@ def create_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
 @app.get("/api/books", response_model=list[schemas.BookOut])
 def read_books(db: Session = Depends(get_db)):
     return crud.get_books(db)
+
+# ISBNから本の情報を取得
+@app.get("/api/fetch_book/{isbn}")
+def fetch_book(isbn: str):
+    book_info = fetch_book_info_by_isbn(isbn)
+    if book_info:
+        return book_info
+    return {"error": "本が見つかりませんでした"}
+
+# タイトルから本の情報を取得
+@app.get("/api/search_book")
+def search_book(title: str):
+    return search_books_by_title(title)
