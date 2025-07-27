@@ -13,8 +13,6 @@ class Book(Base):
     publisher = Column(String)
     cover_image_url = Column(String)
     published_date = Column(Date)
-
-
-# ユーザと紐づけるようの外部キー
-user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-user = relationship("User", back_populates="books")
+    # ユーザと紐づけるようの外部キー
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user = relationship("User", back_populates="books")
