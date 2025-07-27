@@ -1,17 +1,18 @@
 # backend/app/main.py
 
 import os
+
+from app import crud, schemas
+from app.core.database import Base, SessionLocal, engine
+# ✅ 絶対インポートに修正
+from app.models import book, user
+from app.routers import auth
+from app.services.google_books import (fetch_book_info_by_isbn,
+                                       search_books_by_title)
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-
-# ✅ 絶対インポートに修正
-from app.models import user, book
-from app.core.database import SessionLocal, engine, Base
-from app.services.google_books import fetch_book_info_by_isbn, search_books_by_title
-from app import schemas
-from app import crud
 
 # 環境変数読み込み
 load_dotenv()
@@ -80,3 +81,6 @@ def search_book(title: str):
 @app.get("/api/users/check")
 def check_users_table(db: Session = Depends(get_db)):
     return crud.check_users_table_exists(db)
+
+# ルーターを登録
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
