@@ -1,27 +1,62 @@
 // src/App.tsx
 
+import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HomePage } from "./pages/HomePage";
 import { BooksPage } from "./pages/BooksPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { BookDetailPage } from "./pages/BookDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignUpPage";
+import { useAuthStore } from "./stores/authStore";
 
 function App() {
+  const { checkAuth } = useAuthStore();
+
+  // アプリ初期化時に認証状態をチェック
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/books" element={<BooksPage />} />
-          <Route path="/books/:id" element={<BookDetailPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          {/* 404ページ */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        {/* 認証不要のページ */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+
+        {/* 通常のページ（レイアウト付き） */}
+        <Route
+          path="*"
+          element={
+            <Layout>
+              <Routes>
+                {/* 公開ページ */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/books" element={<BooksPage />} />
+                <Route path="/books/:id" element={<BookDetailPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+
+                {/* 認証が必要なページ */}
+                <Route
+                  path="/register"
+                  element={
+                    <ProtectedRoute>
+                      <RegisterPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* 404ページ */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Layout>
+          }
+        />
+      </Routes>
     </Router>
   );
 }
