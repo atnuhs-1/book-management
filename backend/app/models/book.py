@@ -18,3 +18,6 @@ class User(Base):
     id = Column(Integer,primary_key=True, index= )
     username = Column(String,nullable=False)
     email = Column(String, unique=True,nullable=False)
+
+user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+user = relationship("User", back_populates="books")
