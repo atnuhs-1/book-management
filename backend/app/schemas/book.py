@@ -10,10 +10,12 @@ class BookBase(BaseModel):
     published_date: date
 
 class BookCreate(BookBase):
+    user_id: int
     pass
 
 class BookOut(BookBase):
     id: int
+    user_id: int
 
     class Config:
         orm_mode = True  # SQLAlchemyモデル → Pydantic変換に必要

@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date
+from sqlalchemy import Column, Integer, String, Date,ForeignKey
+from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.models.user import User
 
 class Book(Base):
     __tablename__ = "books"
@@ -11,3 +13,6 @@ class Book(Base):
     publisher = Column(String)
     cover_image_url = Column(String)
     published_date = Column(Date)
+    # ユーザと紐づけるようの外部キー
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user = relationship("User", back_populates="books")
