@@ -222,6 +222,36 @@ export const Layout = ({ children }: LayoutProps) => {
             <p className="text-sm text-gray-400 mt-2">
               書籍管理PWA - JWT認証対応 📚
             </p>
+
+            {/* フッターリンク */}
+            <div className="mt-4 flex justify-center space-x-6 text-sm">
+              <Link
+                to="/terms"
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                利用規約
+              </Link>
+              <Link
+                to="/privacy"
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                プライバシーポリシー
+              </Link>
+              <a
+                href="mailto:support@book-management-pwa.com"
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                お問い合わせ
+              </a>
+              <a
+                href="https://github.com/your-team/book-management-pwa"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                GitHub
+              </a>
+            </div>
           </div>
         </div>
       </footer>

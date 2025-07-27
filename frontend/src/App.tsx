@@ -10,7 +10,9 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { BookDetailPage } from "./pages/BookDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LoginPage } from "./pages/LoginPage";
-import { SignupPage } from "./pages/SignUpPage";
+import { SignupPage } from "./pages/SignupPage";
+import { TermsPage } from "./pages/TermsPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { useAuthStore } from "./stores/authStore";
 
 function App() {
@@ -27,6 +29,8 @@ function App() {
         {/* 認証不要のページ */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
 
         {/* 通常のページ（レイアウト付き） */}
         <Route
