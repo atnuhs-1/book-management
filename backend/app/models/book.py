@@ -1,7 +1,5 @@
-# backend/app/models.py
-
 from sqlalchemy import Column, Integer, String, Date
-from .database import Base
+from app.core.database import Base
 
 class Book(Base):
     __tablename__ = "books"

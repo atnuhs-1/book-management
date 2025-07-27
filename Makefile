@@ -1,10 +1,16 @@
-.PHONY: backend frontend 
+.PHONY: backend frontend
 ##########ビルド系
 init:  #新規のビルド
 	docker compose -f compose.yml up -d --build
 
 build:  #キャッシュを使わないビルド,起動はしない
 	docker compose -f compose.yml build --no-cache
+
+build-frontend:  # フロントエンドのみ
+	docker compose -f compose.yml build frontend
+
+build-backend:  # バックエンドのみ
+	docker compose -f compose.yml build backend
 
 up:  #セットアップや既存イメージの再ビルド
 	docker compose -f compose.yml up -d
@@ -61,7 +67,7 @@ ps: . #現在稼働中のコンテナを表示
 
 npm-dev:  #サーバーを起動(コンテナ起動時にport:3000は使われているため、あまり意味はない)
 	docker compose exec app npm run dev
- 
+
 ##########ブラウザ表示系
 
 mac-app:  #MacOSの場合はこれでブラウザが開く
