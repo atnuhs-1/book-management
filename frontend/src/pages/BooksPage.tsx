@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useBookStore } from "../stores/bookStore";
+import { Link } from "react-router-dom";
 
 export const BooksPage = () => {
   // Zustandストアから状態とアクションを取得
@@ -123,9 +124,9 @@ export const BooksPage = () => {
 
                 {/* アクションボタン */}
                 <div className="mt-4 flex space-x-2">
-                  <button className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                  <Link to={`/books/${book.id}`} className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
                     詳細
-                  </button>
+                  </Link>
                   <button className="flex-1 bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-md hover:bg-gray-300 transition-colors duration-200">
                     編集
                   </button>
