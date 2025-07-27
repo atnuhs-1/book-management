@@ -202,7 +202,7 @@ export const LoginPage = () => {
             <p className="text-sm text-gray-600">
               アカウントをお持ちでない場合は{" "}
               <Link
-                to="/register"
+                to="/signup"
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
                 新規登録
