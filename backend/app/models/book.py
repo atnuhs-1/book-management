@@ -1,7 +1,5 @@
-# backend/app/models.py
-
 from sqlalchemy import Column, Integer, String, Date
-from .database import Base
+from app.core.database import Base
 
 class Book(Base):
     __tablename__ = "books"
@@ -13,10 +11,3 @@ class Book(Base):
     publisher = Column(String)
     cover_image_url = Column(String)
     published_date = Column(Date)
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False)
