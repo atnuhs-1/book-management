@@ -1,5 +1,5 @@
-from pydantic import BaseModel
 from datetime import date
+from pydantic import BaseModel
 
 class BookBase(BaseModel):
     title: str
@@ -10,12 +10,11 @@ class BookBase(BaseModel):
     published_date: date
 
 class BookCreate(BookBase):
-    user_id: int
-    pass
+    pass  # user_id は除去！
 
 class BookOut(BookBase):
     id: int
     user_id: int
 
     class Config:
-        orm_mode = True  # SQLAlchemyモデル → Pydantic変換に必要
+        orm_mode = True
