@@ -12,5 +12,5 @@ def create_book(db: Session, book: BookCreate):
 def get_books(db: Session):
     return db.query(Book).all()
 
-def get_books_by_user(db:Session, user_id: int):
-    return db.query(book).filter(Book.user_id==user_id).all()
+def get_books_by_user_id(db: Session, user_id: int):
+    return db.query(Book).filter(Book.user_id == user_id).all()
