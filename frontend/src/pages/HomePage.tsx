@@ -3,13 +3,17 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useBookStore } from "../stores/bookStore";
+import { useAuthStore } from "../stores/authStore";
 
 export const HomePage = () => {
+  const { user } = useAuthStore(); // ✅ ログインユーザーを取得
   const { books, fetchBooks } = useBookStore();
 
   useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
+    if (user?.id) {
+      fetchBooks(user.id);
+    }
+  }, [fetchBooks, user]);
 
   return (
     <div className="space-y-8">

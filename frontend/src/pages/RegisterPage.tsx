@@ -1,6 +1,8 @@
 // src/pages/RegisterPage.tsx
 import { useState } from "react";
 import { useBookStore } from "../stores/bookStore";
+import { useAuthStore } from "../stores/authStore"; // ✅ 追加
+import { useNavigate } from "react-router-dom";     // ✅ 追加
 
 export const RegisterPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<
@@ -8,8 +10,10 @@ export const RegisterPage = () => {
   >(null);
 
   const { createBook, isLoading, error } = useBookStore();
+  const { user } = useAuthStore(); // ✅ ログインユーザーを取得
+  const navigate = useNavigate();  // ✅ 登録完了後に遷移
 
-  // 手動入力フォームの状態（FastAPIスキーマ準拠）
+  // 手動入力フォームの状態
   const [title, setTitle] = useState("");
   const [volume, setVolume] = useState("");
   const [author, setAuthor] = useState("");
@@ -20,7 +24,11 @@ export const RegisterPage = () => {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 必須入力チェック
+    if (!user) {
+      alert("書籍を登録するにはログインが必要です");
+      return;
+    }
+
     if (!title || !volume || !author || !publisher || !coverImageUrl || !publishedDate) {
       alert("全ての項目を入力してください");
       return;
@@ -33,18 +41,13 @@ export const RegisterPage = () => {
       publisher,
       cover_image_url: coverImageUrl,
       published_date: publishedDate,
+      user_id: user.id, // ✅ 必須フィールド
     };
 
     try {
       await createBook(bookData);
       alert("書籍を登録しました！");
-      // 入力をリセット
-      setTitle("");
-      setVolume("");
-      setAuthor("");
-      setPublisher("");
-      setCoverImageUrl("");
-      setPublishedDate("");
+      navigate("/books"); // ✅ 登録後に一覧へ遷移
     } catch {
       alert("書籍の登録に失敗しました");
     }
@@ -52,7 +55,6 @@ export const RegisterPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      {/* ページヘッダー */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">📚 書籍を追加</h1>
         <p className="text-gray-600">書籍を追加する方法を選択してください</p>
@@ -72,9 +74,7 @@ export const RegisterPage = () => {
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
               <span className="text-2xl">📷</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              バーコードスキャン
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900">バーコードスキャン</h3>
           </div>
           <p className="text-sm text-gray-600 mb-4">書籍のバーコード（ISBN）を読み取って自動登録</p>
           <div className="flex items-center text-xs text-blue-600">
@@ -141,7 +141,6 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">巻数 *</label>
               <input
@@ -152,7 +151,6 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">著者 *</label>
               <input
@@ -163,7 +161,6 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">出版社 *</label>
               <input
@@ -174,7 +171,6 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">カバー画像URL *</label>
               <input
@@ -185,7 +181,6 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">出版日 *</label>
               <input
