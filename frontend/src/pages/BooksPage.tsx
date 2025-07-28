@@ -2,19 +2,28 @@
 
 import { useEffect } from "react";
 import { useBookStore } from "../stores/bookStore";
+import { useAuthStore } from "../stores/authStore"; // ✅ 追加
 import { Link } from "react-router-dom";
 
 export const BooksPage = () => {
   // Zustandストアから状態とアクションを取得
-  const { books, isLoading, error, searchQuery, fetchBooks, setSearchQuery } =
-    useBookStore();
+  const {
+    books,
+    isLoading,
+    error,
+    searchQuery,
+    fetchBooks,
+    setSearchQuery,
+  } = useBookStore();
 
-  // 初回レンダリング時に書籍を取得
+  const { user } = useAuthStore(); // ✅ ログインユーザーを取得
+
   useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
+    if (user?.id) {
+      fetchBooks(user.id); // ✅ userのIDで書籍取得
+    }
+  }, [fetchBooks, user]);
 
-  // フィルタリングされた書籍を計算
   const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -26,7 +35,6 @@ export const BooksPage = () => {
       {/* 検索セクション */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex flex-col md:flex-row gap-4">
-          {/* 検索バー */}
           <div className="flex-1">
             <label
               htmlFor="search"
@@ -82,7 +90,6 @@ export const BooksPage = () => {
                 key={book.id}
                 className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
               >
-                {/* 書籍カバー画像 */}
                 <div className="aspect-[3/4] bg-gray-200 rounded-md mb-4 overflow-hidden">
                   {book.cover_image_url ? (
                     <img
@@ -107,7 +114,6 @@ export const BooksPage = () => {
                   </div>
                 </div>
 
-                {/* 書籍情報 */}
                 <div className="space-y-2">
                   <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 leading-tight">
                     {book.title}
@@ -122,9 +128,11 @@ export const BooksPage = () => {
                   </p>
                 </div>
 
-                {/* アクションボタン */}
                 <div className="mt-4 flex space-x-2">
-                  <Link to={`/books/${book.id}`} className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                  <Link
+                    to={`/books/${book.id}`}
+                    className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200"
+                  >
                     詳細
                   </Link>
                   <button className="flex-1 bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-md hover:bg-gray-300 transition-colors duration-200">
