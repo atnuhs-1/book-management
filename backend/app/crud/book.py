@@ -14,3 +14,6 @@ def get_books(db: Session):
 
 def get_books_by_user_id(db: Session, user_id: int):
     return db.query(Book).filter(Book.user_id == user_id).all()
+
+def get_book_by_id(db: Session, book_id: int):
+    return db.query(Book).filter(Book.id == book_id).first()
