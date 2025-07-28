@@ -36,6 +36,32 @@ interface BookStore {
   searchBooksByTitle: (title: string) => Promise<GoogleBookInfo[]>;
 }
 
+// エラーメッセージを文字列に変換する関数
+const formatErrorMessage = (error: any): string => {
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error.response?.data?.detail) {
+    const detail = error.response.data.detail;
+
+    // FastAPIのバリデーションエラーの場合
+    if (Array.isArray(detail)) {
+      return detail
+        .map((e: any) => `${e.loc?.join(".")}: ${e.msg}`)
+        .join(" / ");
+    }
+
+    // 単純な文字列エラーの場合
+    if (typeof detail === "string") {
+      return detail;
+    }
+  }
+
+  // その他のエラー
+  return "エラーが発生しました";
+};
+
 export const useBookStore = create<BookStore>()(
   devtools((set, get) => ({
     books: [],
@@ -65,12 +91,17 @@ export const useBookStore = create<BookStore>()(
     fetchBooks: async (userId: number) => {
       set({ isLoading: true, error: null });
       try {
-        const res = await axios.get(`${API_BASE_URL}/users/${userId}/books`);
-        set({ books: res.data, isLoading: false });
+        // 既存のエンドポイントを使用
+        const response = await axios.get(`${API_BASE_URL}/users/${userId}/books`);
+        set({ books: response.data, isLoading: false });
       } catch (err: any) {
+        const errorMessage = formatErrorMessage(err);
+        console.error("書籍取得エラー:", err);
+
         set({
-          error: err.response?.data?.detail || "書籍の取得に失敗しました",
+          error: errorMessage,
           isLoading: false,
+          books: [], // エラー時は空の配列を設定
         });
       }
     },
@@ -78,12 +109,13 @@ export const useBookStore = create<BookStore>()(
     fetchBookById: async (id: number) => {
       set({ isLoading: true, error: null });
       try {
-        const res = await axios.get(`${API_BASE_URL}/books/${id}`);
-        return res.data;
+        const response = await axios.get(`${API_BASE_URL}/books/${id}`);
+        return response.data;
       } catch (err: any) {
-        set({
-          error: err.response?.data?.detail || "書籍の取得に失敗しました",
-        });
+        const errorMessage = formatErrorMessage(err);
+        console.error("書籍詳細取得エラー:", err);
+
+        set({ error: errorMessage });
         return null;
       } finally {
         set({ isLoading: false });
@@ -93,48 +125,52 @@ export const useBookStore = create<BookStore>()(
     createBook: async (bookData) => {
       set({ isLoading: true, error: null });
       try {
-        const res = await axios.post(`${API_BASE_URL}/books`, bookData);
+        const response = await axios.post(`${API_BASE_URL}/books`, bookData);
         set((state) => ({
-          books: [...state.books, res.data],
+          books: [...state.books, response.data],
           isLoading: false,
         }));
       } catch (err: any) {
-        const detail = err.response?.data?.detail;
-        const message = Array.isArray(detail)
-          ? detail.map((e: any) => `${e.loc?.join(".")}: ${e.msg}`).join(" / ")
-          : detail || "書籍の登録に失敗しました";
+        const errorMessage = formatErrorMessage(err);
+        console.error("書籍作成エラー:", err);
+
         set({
-          error: message,
+          error: errorMessage,
           isLoading: false,
         });
+        throw new Error(errorMessage);
       }
     },
 
     fetchBookByISBN: async (isbn: string) => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/fetch_book/${isbn}`);
-        return res.data;
+        const response = await axios.get(`${API_BASE_URL}/fetch_book/${isbn}`);
+        return response.data;
       } catch (err: any) {
-        set({
-          error: err.response?.data?.detail || "ISBN取得に失敗しました",
-        });
+        const errorMessage = formatErrorMessage(err);
+        console.error("ISBN検索エラー:", err);
+
+        set({ error: errorMessage });
         return null;
       }
     },
 
     searchBooksByTitle: async (title: string) => {
-      set({ isSearching: true });
+      set({ isSearching: true, error: null });
       try {
-        const res = await axios.get(`${API_BASE_URL}/search_book`, {
+        const response = await axios.get(`${API_BASE_URL}/search_book`, {
           params: { title },
         });
-        set({ searchResults: res.data, isSearching: false });
-        return res.data;
+        set({ searchResults: response.data, isSearching: false });
+        return response.data;
       } catch (err: any) {
+        const errorMessage = formatErrorMessage(err);
+        console.error("書籍検索エラー:", err);
+
         set({
-          error:
-            err.response?.data?.detail || "書籍検索に失敗しました",
+          error: errorMessage,
           isSearching: false,
+          searchResults: [], // エラー時は空の配列を設定
         });
         return [];
       }
