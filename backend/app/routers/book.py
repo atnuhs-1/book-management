@@ -2,7 +2,7 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import book as crud_book
 from app.models.user import User
-from app.schemas.book import BookCreate, BookOut
+from app.schemas.book import BookCreate, BookOut, BookUpdate
 from app.services.google_books import (fetch_book_info_by_isbn,
                                        search_books_by_title)
 from fastapi import APIRouter, Depends, HTTPException
@@ -53,6 +53,15 @@ def fetch_book(isbn: str):
 @router.get("/search_book")
 def search_book(title: str):
     return search_books_by_title(title)
+
+@router.put("/books/{book_id}", response_model=BookOut)
+def update_my_book(
+    book_id: int,
+    update_data: BookUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
 # @router.get("/books", response_model=list[BookOut])
 # def read_books(db: Session = Depends(get_db)):
