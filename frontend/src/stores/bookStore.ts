@@ -21,9 +21,13 @@ interface BookStore {
   isSearching: boolean;
   selectedBook: Book | null;
 
+  // ✅ 新機能: 認証関連エラーの状態
+  lastAuthError: string | null;
+  hasAuthError: boolean;
+
   setBooks: (books: Book[]) => void;
   addBook: (book: Book) => void;
-  updateBook: (updatedBook: Book) => void; // ✅ 新規追加
+  updateBook: (updatedBook: Book) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setSearchQuery: (query: string) => void;
@@ -35,54 +39,138 @@ interface BookStore {
   setSelectedBook: (book: Book | null) => void;
   getBookById: (id: number) => Book | null;
 
-  // ✅ 修正: 認証必須のエンドポイントに変更
-  fetchBooks: () => Promise<void>; // userIdパラメータ削除
+  // ✅ 新機能: 認証エラー管理
+  setAuthError: (error: string | null) => void;
+  clearAuthError: () => void;
+
+  fetchBooks: () => Promise<void>;
   fetchBookById: (id: number) => Promise<Book | null>;
   createBook: (bookData: BookCreate) => Promise<void>;
-  updateBookById: (id: number, updateData: BookUpdate) => Promise<void>; // ✅ 新機能
+  updateBookById: (id: number, updateData: BookUpdate) => Promise<void>;
 
   // 外部API（認証不要）
   fetchBookByISBN: (isbn: string) => Promise<GoogleBookInfo | null>;
   searchBooksByTitle: (title: string) => Promise<GoogleBookInfo[]>;
 }
 
-// エラーメッセージを文字列に変換する関数
-const formatErrorMessage = (error: any): string => {
+// ✅ 改良版: エラーメッセージの詳細な判定
+const formatErrorMessage = (
+  error: any
+): { message: string; isAuthError: boolean } => {
   if (typeof error === "string") {
-    return error;
+    return { message: error, isAuthError: false };
   }
 
-  if (error.response?.data?.detail) {
-    const detail = error.response.data.detail;
-
-    // FastAPIのバリデーションエラーの場合
-    if (Array.isArray(detail)) {
-      return detail
-        .map((e: any) => `${e.loc?.join(".")}: ${e.msg}`)
-        .join(" / ");
-    }
-
-    // 単純な文字列エラーの場合
-    if (typeof detail === "string") {
-      return detail;
-    }
+  // ネットワークエラー
+  if (!error.response) {
+    return {
+      message:
+        "ネットワークエラーが発生しました。インターネット接続を確認してください。",
+      isAuthError: false,
+    };
   }
 
-  // HTTPステータスコード別のエラーメッセージ
-  if (error.response?.status === 403) {
-    return "この操作を行う権限がありません";
-  }
+  const { status, data } = error.response;
 
-  if (error.response?.status === 404) {
-    return "書籍が見つかりません";
-  }
+  // HTTPステータスコード別の詳細メッセージ
+  switch (status) {
+    case 401:
+      const detail = data?.detail || "";
 
+      // ✅ バックエンドからの期限切れメッセージを検出
+      if (
+        detail.includes("有効期限が切れました") ||
+        detail.includes("expired")
+      ) {
+        return {
+          message:
+            "セッションの有効期限が切れました。再度ログインしてください。",
+          isAuthError: true,
+        };
+      }
+
+      if (
+        detail.includes("認証情報が無効です") ||
+        detail.includes("トークンが無効です")
+      ) {
+        return {
+          message: "認証情報が無効です。ログインし直してください。",
+          isAuthError: true,
+        };
+      }
+
+      if (detail.includes("ユーザーが見つかりません")) {
+        return {
+          message: "ユーザー情報が見つかりません。再度ログインしてください。",
+          isAuthError: true,
+        };
+      }
+
+      return {
+        message: detail || "認証に失敗しました。ログインしてください。",
+        isAuthError: true,
+      };
+
+    case 403:
+      return {
+        message: "この操作を行う権限がありません。",
+        isAuthError: false,
+      };
+
+    case 404:
+      return {
+        message: "書籍が見つかりません。削除された可能性があります。",
+        isAuthError: false,
+      };
+
+    case 422:
+      // FastAPIのバリデーションエラー
+      if (Array.isArray(data?.detail)) {
+        const validationErrors = data.detail
+          .map((e: any) => {
+            const field = e.loc?.join(".");
+            const message = e.msg;
+            return `${field}: ${message}`;
+          })
+          .join(", ");
+        return {
+          message: `入力エラー: ${validationErrors}`,
+          isAuthError: false,
+        };
+      }
+      return {
+        message: "入力データに問題があります。",
+        isAuthError: false,
+      };
+
+    case 500:
+      return {
+        message:
+          "サーバーエラーが発生しました。しばらく待ってから再試行してください。",
+        isAuthError: false,
+      };
+
+    default:
+      // カスタムメッセージがある場合
+      if (data?.detail) {
+        if (typeof data.detail === "string") {
+          return { message: data.detail, isAuthError: false };
+        }
+      }
+      return {
+        message: `エラーが発生しました (${status})`,
+        isAuthError: false,
+      };
+  }
+};
+
+// ✅ 新機能: 認証エラーをAuthStoreに委譲
+const handleAuthenticationError = (error: any): boolean => {
   if (error.response?.status === 401) {
-    return "認証が必要です。ログインしてください";
+    // authStoreがAxiosインターセプターで自動処理するため、ここでは何もしない
+    return true; // 認証エラーが検出されたことを示す
   }
-
-  // その他のエラー
-  return "エラーが発生しました";
+  return false;
 };
 
 export const useBookStore = create<BookStore>()(
@@ -94,11 +182,12 @@ export const useBookStore = create<BookStore>()(
     searchResults: [],
     isSearching: false,
     selectedBook: null,
+    lastAuthError: null, // ✅ 新規追加
+    hasAuthError: false, // ✅ 新規追加
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
 
-    // ✅ 新機能: ローカル状態の書籍を更新
     updateBook: (updatedBook) =>
       set((state) => ({
         books: state.books.map((book) =>
@@ -120,65 +209,103 @@ export const useBookStore = create<BookStore>()(
       return books.find((b) => b.id === id) || null;
     },
 
-    // ✅ 修正: GET /api/me/books（認証必須）
+    // ✅ 新機能: 認証エラー管理
+    setAuthError: (error) =>
+      set({ lastAuthError: error, hasAuthError: !!error }),
+    clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
+
+    // ✅ 改良版: 書籍一覧取得（認証エラー処理強化）
     fetchBooks: async () => {
       set({ isLoading: true, error: null });
       try {
         const response = await axios.get(`${API_BASE_URL}/me/books`);
         set({ books: response.data, isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
         console.error("書籍取得エラー:", err);
 
-        set({
-          error: errorMessage,
-          isLoading: false,
-          books: [], // エラー時は空の配列を設定
-        });
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          // Axiosインターセプターが自動でAuthStoreを処理するため、
+          // ここではエラーメッセージを設定しない
+          set({ isLoading: false });
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+            books: [],
+          });
+        }
       }
     },
 
-    // ✅ 修正: 認証必須の書籍詳細取得
+    // ✅ 改良版: 書籍詳細取得（認証エラー処理強化）
     fetchBookById: async (id: number) => {
       set({ isLoading: true, error: null });
       try {
         const response = await axios.get(`${API_BASE_URL}/books/${id}`);
+        set({ isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
         return response.data;
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
         console.error("書籍詳細取得エラー:", err);
-        console.error("エラーレスポンス:", err.response);
 
-        set({ error: errorMessage });
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+        } else {
+          // ✅ 通常のエラーの場合
+          set({ error: message, isLoading: false });
+        }
         return null;
-      } finally {
-        set({ isLoading: false });
       }
     },
 
-    // ✅ 修正: 認証必須の書籍作成（user_idは自動設定）
+    // ✅ 改良版: 書籍作成（認証エラー処理強化）
     createBook: async (bookData) => {
       set({ isLoading: true, error: null });
       try {
-        // ✅ user_idは既に型定義から削除されているため、そのまま送信
         const response = await axios.post(`${API_BASE_URL}/books`, bookData);
         set((state) => ({
           books: [...state.books, response.data],
           isLoading: false,
         }));
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
         console.error("書籍作成エラー:", err);
 
-        set({
-          error: errorMessage,
-          isLoading: false,
-        });
-        throw new Error(errorMessage);
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+          throw new Error("認証が必要です");
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+          });
+          throw new Error(message);
+        }
       }
     },
 
-    // ✅ 新機能: 書籍更新（認証必須、所有者チェック付き）
+    // ✅ 改良版: 書籍更新（認証エラー処理強化）
     updateBookById: async (id: number, updateData: BookUpdate) => {
       set({ isLoading: true, error: null });
       try {
@@ -192,28 +319,40 @@ export const useBookStore = create<BookStore>()(
         updateBook(response.data);
 
         set({ isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
         console.error("書籍更新エラー:", err);
 
-        set({
-          error: errorMessage,
-          isLoading: false,
-        });
-        throw new Error(errorMessage);
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+          throw new Error("認証が必要です");
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+          });
+          throw new Error(message);
+        }
       }
     },
 
-    // 外部API（認証不要）
+    // 外部API（認証不要）- 変更なし
     fetchBookByISBN: async (isbn: string) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/fetch_book/${isbn}`);
         return response.data;
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
+        const { message } = formatErrorMessage(err);
         console.error("ISBN検索エラー:", err);
 
-        set({ error: errorMessage });
+        set({ error: message });
         return null;
       }
     },
@@ -227,13 +366,13 @@ export const useBookStore = create<BookStore>()(
         set({ searchResults: response.data, isSearching: false });
         return response.data;
       } catch (err: any) {
-        const errorMessage = formatErrorMessage(err);
+        const { message } = formatErrorMessage(err);
         console.error("書籍検索エラー:", err);
 
         set({
-          error: errorMessage,
+          error: message,
           isSearching: false,
-          searchResults: [], // エラー時は空の配列を設定
+          searchResults: [],
         });
         return [];
       }
@@ -241,8 +380,7 @@ export const useBookStore = create<BookStore>()(
   }))
 );
 
-
 // デバッグ用（開発環境のみ）
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   (window as any).bookStore = useBookStore;
 }
