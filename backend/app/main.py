@@ -1,18 +1,19 @@
 # backend/app/main.py
 
+import asyncio
 import os
-from dotenv import load_dotenv
 
+from app.core.database import Base, engine
+# モデルを明示的にインポート（テーブル作成のため）
+from app.models import book, user
+# ルーターのインポート
+from app.routers.book import router as book_router
+from app.routers.emergency import router as emergency_router
+from app.routers.user import router as user_router
+from app.services.notification.scheduler import start_expiration_check_loop
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.database import Base, engine
-
-# モデルを明示的にインポート（テーブル作成のため）
-from app.models import user, book
-
-# ルーターのインポート
-from app.routers import user as user_router
-from app.routers import book as book_router
 
 # 環境変数読み込み
 load_dotenv()
@@ -42,5 +43,15 @@ async def test():
     return {"status": "ok", "message": "API is working"}
 
 # ルーターの登録
-app.include_router(user_router.router, prefix="/api/auth", tags=["auth"])
-app.include_router(book_router.router, prefix="/api", tags=["books"])
+app.include_router(user_router, prefix="/api/auth", tags=["auth"])
+app.include_router(book_router, prefix="/api", tags=["books"])
+app.include_router(emergency_router)
+
+#start_expiration_check_loop()
+
+from app.services.notification.scheduler import start_expiration_check_loop
+
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(start_expiration_check_loop())
