@@ -16,12 +16,34 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { useAuthStore } from "./stores/authStore";
 
 function App() {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, isLoading } = useAuthStore();
 
-  // アプリ初期化時に認証状態をチェック
+  // ✅ 修正: 依存配列を空にして初回のみ実行
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const initializeAuth = async () => {
+      try {
+        console.log("App - 認証チェック開始"); // デバッグ情報
+        await checkAuth();
+        console.log("App - 認証チェック完了"); // デバッグ情報
+      } catch (error) {
+        console.error("Authentication check failed:", error);
+      }
+    };
+
+    initializeAuth();
+  }, []); // ✅ 空の依存配列に変更
+
+  // ✅ 認証チェック中はローディング表示
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">アプリを初期化中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>

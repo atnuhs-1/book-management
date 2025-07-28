@@ -10,7 +10,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout, isLoading } = useAuthStore(); // ✅ isLoadingを追加
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // アクティブなナビゲーションリンクのスタイル
@@ -64,6 +64,14 @@ export const Layout = ({ children }: LayoutProps) => {
 
             {/* ユーザー情報・認証ボタン */}
             <div className="flex items-center space-x-4">
+              {/* ✅ 認証ローディング状態の表示 */}
+              {isLoading && (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                  <span className="text-sm text-gray-600">認証確認中...</span>
+                </div>
+              )}
+
               {/* ステータスバッジ */}
               <div className="hidden lg:flex space-x-2">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -72,6 +80,18 @@ export const Layout = ({ children }: LayoutProps) => {
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   React + Zustand
                 </span>
+                {/* ✅ 認証状態のデバッグ表示（開発用） */}
+                {process.env.NODE_ENV === "development" && (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      isAuthenticated
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {isAuthenticated ? "認証済み" : "未認証"}
+                  </span>
+                )}
               </div>
 
               {/* 認証状態による表示切り替え */}
@@ -80,15 +100,17 @@ export const Layout = ({ children }: LayoutProps) => {
                   {/* ユーザー情報 */}
                   <div className="hidden md:block text-right">
                     <p className="text-sm font-medium text-gray-900">
-                      {user?.username}
+                      {user?.username || "Unknown User"}
                     </p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
+                    <p className="text-xs text-gray-500">
+                      {user?.email || "No Email"}
+                    </p>
                   </div>
 
                   {/* ユーザーアバター */}
                   <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm font-bold">
-                      {user?.username?.charAt(0).toUpperCase()}
+                      {user?.username?.charAt(0).toUpperCase() || "?"}
                     </span>
                   </div>
 
@@ -170,9 +192,17 @@ export const Layout = ({ children }: LayoutProps) => {
                     <div className="space-y-2">
                       <div className="px-3 py-2">
                         <p className="text-sm font-medium text-gray-900">
-                          {user?.username}
+                          {user?.username || "Unknown User"}
                         </p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-xs text-gray-500">
+                          {user?.email || "No Email"}
+                        </p>
+                        {/* ✅ デバッグ情報（開発用） */}
+                        {process.env.NODE_ENV === "development" && (
+                          <p className="text-xs text-blue-500">
+                            ID: {user?.id}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={handleLogout}
