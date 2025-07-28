@@ -10,14 +10,15 @@ export const BooksPage = () => {
   const { books, isLoading, error, searchQuery, fetchBooks, setSearchQuery } =
     useBookStore();
 
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isInitialized } = useAuthStore(); // ✅ isInitializedを追加
 
-  // ✅ 修正: useCallbackで関数をメモ化
+  // ✅ 修正: 認証初期化完了後にのみ書籍を取得
   const loadBooks = useCallback(async () => {
-    if (isAuthenticated) {
+    if (isAuthenticated && isInitialized) {
+      // ✅ 両方の条件をチェック
       await fetchBooks();
     }
-  }, [isAuthenticated, fetchBooks]);
+  }, [isAuthenticated, isInitialized, fetchBooks]); // ✅ isInitializedを依存配列に追加
 
   useEffect(() => {
     loadBooks();

@@ -142,15 +142,7 @@ export const useBookStore = create<BookStore>()(
     fetchBookById: async (id: number) => {
       set({ isLoading: true, error: null });
       try {
-        // ✅ デバッグ情報を追加
-        console.log("fetchBookById - 書籍ID:", id);
-        console.log(
-          "fetchBookById - Authorization header:",
-          axios.defaults.headers.common["Authorization"]
-        );
-
         const response = await axios.get(`${API_BASE_URL}/books/${id}`);
-        console.log("fetchBookById - 成功:", response.data);
         return response.data;
       } catch (err: any) {
         const errorMessage = formatErrorMessage(err);
@@ -248,3 +240,9 @@ export const useBookStore = create<BookStore>()(
     },
   }))
 );
+
+
+// デバッグ用（開発環境のみ）
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  (window as any).bookStore = useBookStore;
+}
