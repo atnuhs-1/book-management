@@ -21,6 +21,7 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isInitialized: boolean;
 
   // アクション
   setUser: (user: User | null) => void;
@@ -28,6 +29,7 @@ interface AuthStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+  setInitialized: (initialized: boolean) => void;
 
   // 認証関連アクション
   login: (credentials: LoginRequest) => Promise<void>;
@@ -52,6 +54,7 @@ export const useAuthStore = create<AuthStore>()(
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        isInitialized: false, // ✅ 新規追加
 
         // 基本的な状態操作
         setUser: (user) =>
@@ -64,6 +67,9 @@ export const useAuthStore = create<AuthStore>()(
         setError: (error) => set({ error }, false, "setError"),
 
         clearError: () => set({ error: null }, false, "clearError"),
+
+        setInitialized: (isInitialized) =>
+          set({ isInitialized }, false, "setInitialized"), // ✅ 新規追加
 
         // Axiosヘッダー管理
         setAuthHeader: (token) => {
@@ -199,26 +205,23 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
-        // ✅ 修正: 認証状態確認（シンプル版、無限ループ防止）
         checkAuth: () => {
-          const { token, setAuthHeader, logout, user } = get();
+          const { token, setAuthHeader, logout, user, setInitialized } = get(); // ✅ setInitializedを追加
 
           if (token) {
-            // トークンが存在する場合、Axiosヘッダーに設定
             setAuthHeader(token);
 
-            // ユーザー情報が存在しない場合のみ警告（デバッグ用）
             if (!user) {
               console.warn(
-                "checkAuth: トークンは存在しますが、ユーザー情報がありません。ログイン時に設定されているはずです。"
+                "checkAuth: トークンは存在しますが、ユーザー情報がありません。"
               );
             }
-
-            // ✅ 重要: getCurrentUserは呼び出さない（無限ループ防止）
-            // 必要に応じて手動でgetCurrentUserを呼び出す
           } else {
             logout();
           }
+
+          // ✅ 重要: 認証チェック完了フラグを設定
+          setInitialized(true);
         },
       }),
       {
