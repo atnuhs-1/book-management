@@ -1,34 +1,64 @@
 // src/pages/BooksPage.tsx
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useBookStore } from "../stores/bookStore";
-import { useAuthStore } from "../stores/authStore"; // ✅ 追加
+import { useAuthStore } from "../stores/authStore";
 import { Link } from "react-router-dom";
 
 export const BooksPage = () => {
   // Zustandストアから状態とアクションを取得
-  const {
-    books,
-    isLoading,
-    error,
-    searchQuery,
-    fetchBooks,
-    setSearchQuery,
-  } = useBookStore();
+  const { books, isLoading, error, searchQuery, fetchBooks, setSearchQuery } =
+    useBookStore();
 
-  const { user } = useAuthStore(); // ✅ ログインユーザーを取得
+  const { isAuthenticated } = useAuthStore();
+
+  // ✅ 修正: useCallbackで関数をメモ化
+  const loadBooks = useCallback(async () => {
+    if (isAuthenticated) {
+      await fetchBooks();
+    }
+  }, [isAuthenticated, fetchBooks]);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchBooks(user.id); // ✅ userのIDで書籍取得
-    }
-  }, [fetchBooks, user]);
+    loadBooks();
+  }, [loadBooks]); // ✅ loadBooks関数に依存
 
   const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.author.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // ✅ 修正: 未認証の場合の表示
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            書籍一覧を見るにはログインが必要です
+          </h1>
+          <p className="text-gray-600 mb-6">
+            アカウントにログインして書籍管理を始めましょう
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/login"
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              ログイン
+            </Link>
+            <Link
+              to="/signup"
+              className="border border-indigo-600 text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors"
+            >
+              新規登録
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -50,6 +80,15 @@ export const BooksPage = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+          </div>
+          {/* ✅ 新規追加: 書籍追加ボタン */}
+          <div className="flex items-end">
+            <Link
+              to="/register"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors font-medium"
+            >
+              ➕ 書籍を追加
+            </Link>
           </div>
         </div>
       </div>
@@ -73,7 +112,18 @@ export const BooksPage = () => {
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800 font-medium">❌ {error}</p>
+            <div className="flex items-center">
+              <span className="text-red-400 mr-2">❌</span>
+              <div>
+                <p className="text-red-800 font-medium">{error}</p>
+                <button
+                  onClick={() => fetchBooks()}
+                  className="text-red-600 hover:text-red-800 text-sm underline mt-1"
+                >
+                  再試行
+                </button>
+              </div>
+            </div>
           </div>
         ) : filteredBooks.length === 0 ? (
           <div className="text-center py-12">
@@ -81,7 +131,19 @@ export const BooksPage = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               {searchQuery ? "該当する書籍がありません" : "書籍がありません"}
             </h3>
-            <p className="text-gray-500">書籍を追加してみましょう</p>
+            <p className="text-gray-500 mb-4">
+              {searchQuery
+                ? "検索条件を変更してみてください"
+                : "書籍を追加してみましょう"}
+            </p>
+            {!searchQuery && (
+              <Link
+                to="/register"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                ➕ 最初の書籍を追加
+              </Link>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -90,29 +152,31 @@ export const BooksPage = () => {
                 key={book.id}
                 className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
               >
-                <div className="aspect-[3/4] bg-gray-200 rounded-md mb-4 overflow-hidden">
-                  {book.cover_image_url ? (
-                    <img
-                      src={book.cover_image_url}
-                      alt={book.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                        (
-                          e.target as HTMLImageElement
-                        ).nextElementSibling!.classList.remove("hidden");
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`w-full h-full flex items-center justify-center ${book.cover_image_url ? "hidden" : ""}`}
-                  >
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">📖</div>
-                      <p className="text-xs text-gray-500">カバー画像なし</p>
+                <Link to={`/books/${book.id}`}>
+                  <div className="aspect-[3/4] bg-gray-200 rounded-md mb-4 overflow-hidden hover:opacity-90 transition-opacity">
+                    {book.cover_image_url ? (
+                      <img
+                        src={book.cover_image_url}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                          (
+                            e.target as HTMLImageElement
+                          ).nextElementSibling!.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-full flex items-center justify-center ${book.cover_image_url ? "hidden" : ""}`}
+                    >
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">📖</div>
+                        <p className="text-xs text-gray-500">カバー画像なし</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 <div className="space-y-2">
                   <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 leading-tight">
@@ -131,13 +195,16 @@ export const BooksPage = () => {
                 <div className="mt-4 flex space-x-2">
                   <Link
                     to={`/books/${book.id}`}
-                    className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200"
+                    className="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 text-center"
                   >
                     詳細
                   </Link>
-                  <button className="flex-1 bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-md hover:bg-gray-300 transition-colors duration-200">
+                  <Link
+                    to={`/books/${book.id}`}
+                    className="flex-1 bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-md hover:bg-gray-300 transition-colors duration-200 text-center"
+                  >
                     編集
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}

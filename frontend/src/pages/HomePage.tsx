@@ -1,19 +1,24 @@
 // src/pages/HomePage.tsx
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
 
 export const HomePage = () => {
-  const { user } = useAuthStore(); // ✅ ログインユーザーを取得
+  const { isAuthenticated } = useAuthStore();
   const { books, fetchBooks } = useBookStore();
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchBooks(user.id);
+  // ✅ 修正: useCallbackで関数をメモ化
+  const loadBooks = useCallback(async () => {
+    if (isAuthenticated) {
+      await fetchBooks();
     }
-  }, [fetchBooks, user]);
+  }, [isAuthenticated, fetchBooks]);
+
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]); // ✅ loadBooks関数に依存
 
   return (
     <div className="space-y-8">
@@ -25,18 +30,38 @@ export const HomePage = () => {
             バーコード読み取りで簡単に書籍を管理しよう
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/register"
-              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-            >
-              📷 書籍を追加
-            </Link>
-            <Link
-              to="/books"
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-400 transition-colors"
-            >
-              📖 書籍一覧を見る
-            </Link>
+            {/* ✅ 修正: 認証状態に応じてボタンを表示 */}
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/register"
+                  className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+                >
+                  📷 書籍を追加
+                </Link>
+                <Link
+                  to="/books"
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-400 transition-colors"
+                >
+                  📖 書籍一覧を見る
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/signup"
+                  className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+                >
+                  🆕 新規登録
+                </Link>
+                <Link
+                  to="/login"
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-400 transition-colors"
+                >
+                  🔑 ログイン
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -85,78 +110,110 @@ export const HomePage = () => {
         </div>
       </div>
 
-      {/* 統計ダッシュボード */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-          <div className="w-4 h-4 bg-purple-500 rounded-full mr-3"></div>
-          統計情報
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {books.length}
-            </div>
-            <div className="text-sm text-gray-600">総書籍数</div>
-          </div>
-
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-3xl font-bold text-green-600 mb-2">0</div>
-            <div className="text-sm text-gray-600">読了済み</div>
-          </div>
-
-          <div className="text-center p-4 bg-orange-50 rounded-lg">
-            <div className="text-3xl font-bold text-orange-600 mb-2">
-              {books.length}
-            </div>
-            <div className="text-sm text-gray-600">積読</div>
-          </div>
-
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <div className="text-3xl font-bold text-purple-600 mb-2">0</div>
-            <div className="text-sm text-gray-600">今月読了</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 最近追加した書籍 */}
-      {books.length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-              <div className="w-4 h-4 bg-green-500 rounded-full mr-3"></div>
-              最近追加した書籍
+      {/* ✅ 修正: 認証状態に応じて統計セクションを表示 */}
+      {isAuthenticated ? (
+        <>
+          {/* 統計ダッシュボード */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+              <div className="w-4 h-4 bg-purple-500 rounded-full mr-3"></div>
+              統計情報
             </h2>
-            <Link
-              to="/books"
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              すべて見る →
-            </Link>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600 mb-2">
+                  {books.length}
+                </div>
+                <div className="text-sm text-gray-600">総書籍数</div>
+              </div>
+
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-3xl font-bold text-green-600 mb-2">0</div>
+                <div className="text-sm text-gray-600">読了済み</div>
+              </div>
+
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-3xl font-bold text-orange-600 mb-2">
+                  {books.length}
+                </div>
+                <div className="text-sm text-gray-600">積読</div>
+              </div>
+
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600 mb-2">0</div>
+                <div className="text-sm text-gray-600">今月読了</div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {books.slice(0, 5).map((book) => (
-              <div key={book.id} className="text-center">
-                <div className="aspect-[3/4] bg-gray-200 rounded-md mb-2 overflow-hidden">
-                  {book.cover_image_url ? (
-                    <img
-                      src={book.cover_image_url}
-                      alt={book.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-2xl">📖</span>
-                    </div>
-                  )}
-                </div>
-                <h3 className="text-sm font-medium text-gray-900 line-clamp-2">
-                  {book.title}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">{book.author}</p>
+          {/* 最近追加した書籍 */}
+          {books.length > 0 && (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                  <div className="w-4 h-4 bg-green-500 rounded-full mr-3"></div>
+                  最近追加した書籍
+                </h2>
+                <Link
+                  to="/books"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  すべて見る →
+                </Link>
               </div>
-            ))}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {books.slice(0, 5).map((book) => (
+                  <div key={book.id} className="text-center">
+                    <Link to={`/books/${book.id}`}>
+                      <div className="aspect-[3/4] bg-gray-200 rounded-md mb-2 overflow-hidden hover:shadow-md transition-shadow">
+                        {book.cover_image_url ? (
+                          <img
+                            src={book.cover_image_url}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-2xl">📖</span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                    <h3 className="text-sm font-medium text-gray-900 line-clamp-2">
+                      {book.title}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">{book.author}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        // ✅ 新規追加: 未認証ユーザー向けの案内
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="text-6xl mb-4">🔐</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            書籍管理を始めよう
+          </h2>
+          <p className="text-gray-600 mb-6">
+            アカウントを作成すると、書籍の登録・管理ができるようになります
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/signup"
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              無料で始める
+            </Link>
+            <Link
+              to="/login"
+              className="border border-indigo-600 text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors"
+            >
+              ログイン
+            </Link>
           </div>
         </div>
       )}

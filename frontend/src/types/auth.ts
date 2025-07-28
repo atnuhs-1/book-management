@@ -21,10 +21,11 @@ export interface RegisterRequest {
   confirmPassword?: string; // フロントエンド用の確認パスワード
 }
 
-// 認証レスポンスの型
+// 認証レスポンスの型（バックエンド修正に対応）
 export interface AuthResponse {
   access_token: string;
   token_type: string;
+  user: User; // ✅ 追加: バックエンドがユーザー情報も返すように変更
 }
 
 // フォームエラーの型

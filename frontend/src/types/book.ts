@@ -1,7 +1,6 @@
 // src/types/book.ts
 
 // バックエンドのスキーマに対応した型定義
-// types/book.ts
 
 export interface Book {
   id: number;
@@ -11,7 +10,7 @@ export interface Book {
   publisher: string;
   cover_image_url: string;
   published_date: string;
-  user_id: number; // ✅ 追加
+  user_id: number;
 }
 
 export interface BookCreate {
@@ -21,7 +20,18 @@ export interface BookCreate {
   publisher: string;
   cover_image_url: string;
   published_date: string;
-  user_id: number; // ✅ 追加
+  // user_id: number; ✅ 削除：バックエンドで自動設定される
+}
+
+// ✅ 新規追加: 書籍更新用の型（任意のフィールドを更新可能）
+export interface BookUpdate {
+  title?: string;
+  volume?: string;
+  author?: string;
+  publisher?: string;
+  cover_image_url?: string;
+  published_date?: string;
+  // user_idは更新不可（セキュリティ上の理由）
 }
 
 export interface GoogleBookInfo {
@@ -32,7 +42,6 @@ export interface GoogleBookInfo {
   cover_image_url: string;
   published_date: string;
 }
-
 
 // API関連の型
 export interface ApiResponse<T> {
