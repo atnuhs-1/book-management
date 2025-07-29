@@ -72,3 +72,18 @@ npm-dev:  #サーバーを起動(コンテナ起動時にport:3000は使われ�
 
 mac-app:  #MacOSの場合はこれでブラウザが開く
 	open http://localhost:5173
+
+# データベース完全リセット
+reset-db:
+	docker-compose down -v
+	docker-compose up -d
+
+# 完全リセット（イメージ再ビルド含む）
+reset-all:
+	docker-compose down -v
+	docker system prune -f
+	docker-compose up -d --build
+
+# ボリューム確認
+check-volumes:
+	docker volume ls | grep $(shell basename $(PWD))

@@ -1,7 +1,6 @@
 from app.core.database import Base
 from sqlalchemy import Column, Date, Integer, String
 from sqlalchemy.orm import relationship
-# from app.models.book import Book
 
 
 class User(Base):
