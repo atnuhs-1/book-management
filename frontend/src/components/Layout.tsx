@@ -8,7 +8,15 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const { user, isAuthenticated, logout, isLoading } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    isLoading,
+    isTokenExpired,
+    lastAuthError,
+  } = useAuthStore(); // ✅ 認証エラー状態を監視
+
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
   const mobileUserMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,10 +91,21 @@ export const Layout = ({ children }: LayoutProps) => {
             </nav>
 
             <div className="flex items-center space-x-4">
+              {/* ✅ 修正: ローディング状態の詳細表示 */}
               {isLoading && (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
                   <span className="text-sm text-gray-600">認証確認中...</span>
+                </div>
+              )}
+
+              {/* ✅ 新機能: 認証エラー状態の視覚的な表示 */}
+              {isTokenExpired && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-red-100 border border-red-300 rounded-md">
+                  <span className="text-red-600 text-sm">⚠️</span>
+                  <span className="text-sm text-red-700 font-medium">
+                    セッション期限切れ
+                  </span>
                 </div>
               )}
 
@@ -108,6 +127,12 @@ export const Layout = ({ children }: LayoutProps) => {
                     <p className="text-xs text-gray-500">
                       {user?.email || "No Email"}
                     </p>
+                    {/* ✅ 新機能: 認証状態の詳細表示 */}
+                    {isTokenExpired && (
+                      <p className="text-xs text-red-600 font-medium">
+                        再ログインが必要
+                      </p>
+                    )}
                   </div>
 
                   <div className="md:hidden relative" ref={mobileUserMenuRef}>
@@ -115,7 +140,11 @@ export const Layout = ({ children }: LayoutProps) => {
                       onClick={() =>
                         setIsMobileUserMenuOpen(!isMobileUserMenuOpen)
                       }
-                      className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center"
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isTokenExpired
+                          ? "bg-red-600 ring-2 ring-red-300" // ✅ 期限切れ時の視覚効果
+                          : "bg-indigo-600"
+                      }`}
                     >
                       <span className="text-white text-sm font-bold">
                         {user?.username?.charAt(0).toUpperCase() || "?"}
@@ -128,6 +157,12 @@ export const Layout = ({ children }: LayoutProps) => {
                           <p className="text-xs text-gray-500">
                             {user?.email || "No Email"}
                           </p>
+                          {/* ✅ モバイル版でも認証状態表示 */}
+                          {isTokenExpired && (
+                            <p className="text-xs text-red-600 font-medium mt-1">
+                              ⚠️ 再ログインが必要
+                            </p>
+                          )}
                         </div>
                         <button
                           onClick={handleLogout}
@@ -140,16 +175,26 @@ export const Layout = ({ children }: LayoutProps) => {
                   </div>
 
                   <div className="hidden md:flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isTokenExpired
+                          ? "bg-red-600 ring-2 ring-red-300" // ✅ 期限切れ時の視覚効果
+                          : "bg-indigo-600"
+                      }`}
+                    >
                       <span className="text-white text-sm font-bold">
                         {user?.username?.charAt(0).toUpperCase() || "?"}
                       </span>
                     </div>
                     <button
                       onClick={handleLogout}
-                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                      className={`px-3 py-1 text-sm border rounded-md transition-colors ${
+                        isTokenExpired
+                          ? "text-red-600 border-red-300 hover:bg-red-50" // ✅ 期限切れ時の色変更
+                          : "text-gray-600 hover:text-gray-800 border-gray-300 hover:bg-gray-50"
+                      }`}
                     >
-                      ログアウト
+                      {isTokenExpired ? "再ログイン" : "ログアウト"}
                     </button>
                   </div>
                 </div>
@@ -178,7 +223,7 @@ export const Layout = ({ children }: LayoutProps) => {
         {children}
       </main>
 
-      {/* ✅ ボトムナビゲーションにもウィッシュリスト追加 */}
+      {/* ボトムナビゲーション */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-md md:hidden">
         <div className="flex justify-around items-center py-2">
           <Link to="/" className={getMobileTabClass("/")}>
