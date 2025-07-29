@@ -13,12 +13,12 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { TermsPage } from "./pages/TermsPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { WishlistPage } from "./pages/WishlistPage"; // ✅ 追加
 import { useAuthStore } from "./stores/authStore";
 
 function App() {
   const { checkAuth, isLoading } = useAuthStore();
 
-  // ✅ 修正: 依存配列を空にして初回のみ実行
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -29,9 +29,8 @@ function App() {
     };
 
     initializeAuth();
-  }, []); // ✅ 空の依存配列に変更
+  }, []);
 
-  // ✅ 認証チェック中はローディング表示
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -62,6 +61,7 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/books" element={<BooksPage />} />
                 <Route path="/books/:id" element={<BookDetailPage />} />
+                <Route path="/wishlist" element={<WishlistPage />} /> {/* ✅ 追加 */}
                 <Route path="/settings" element={<SettingsPage />} />
 
                 {/* 認証が必要なページ */}
