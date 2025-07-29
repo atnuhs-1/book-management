@@ -22,9 +22,7 @@ function App() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log("App - 認証チェック開始"); // デバッグ情報
         await checkAuth();
-        console.log("App - 認証チェック完了"); // デバッグ情報
       } catch (error) {
         console.error("Authentication check failed:", error);
       }

@@ -6,19 +6,18 @@ import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
 
 export const HomePage = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isInitialized } = useAuthStore();
   const { books, fetchBooks } = useBookStore();
 
-  // ✅ 修正: useCallbackで関数をメモ化
   const loadBooks = useCallback(async () => {
-    if (isAuthenticated) {
+    if (isAuthenticated && isInitialized) {
       await fetchBooks();
     }
-  }, [isAuthenticated, fetchBooks]);
+  }, [isAuthenticated, isInitialized, fetchBooks]);
 
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]); // ✅ loadBooks関数に依存
+  }, [loadBooks]);
 
   return (
     <div className="space-y-8">

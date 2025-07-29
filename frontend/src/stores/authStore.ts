@@ -21,6 +21,11 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isInitialized: boolean;
+
+  // ✅ 新機能: 期限切れ関連の状態
+  isTokenExpired: boolean;
+  lastAuthError: string | null;
 
   // アクション
   setUser: (user: User | null) => void;
@@ -28,18 +33,82 @@ interface AuthStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+  setInitialized: (initialized: boolean) => void;
+
+  // ✅ 新機能: 期限切れ関連のアクション
+  setTokenExpired: (expired: boolean) => void;
+  setLastAuthError: (error: string | null) => void;
 
   // 認証関連アクション
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   checkAuth: () => void;
-  getCurrentUser: () => Promise<void>; // ✅ 新機能: 現在のユーザー情報取得
+  getCurrentUser: () => Promise<void>;
 
   // トークンをAxiosヘッダーに設定
   setAuthHeader: (token: string) => void;
   clearAuthHeader: () => void;
+
+  // ✅ 新機能: エラーハンドリング
+  handleAuthError: (error: any) => boolean; // 認証エラーかどうかを返す
 }
+
+// ✅ 新機能: エラーメッセージの解析
+const parseAuthError = (
+  error: any
+): { message: string; isTokenExpired: boolean; shouldLogout: boolean } => {
+  if (!error.response) {
+    return {
+      message: "ネットワークエラーが発生しました",
+      isTokenExpired: false,
+      shouldLogout: false,
+    };
+  }
+
+  const { status, data } = error.response;
+
+  if (status === 401) {
+    const detail = data?.detail || "";
+
+    // ✅ バックエンドからの期限切れメッセージを検出
+    if (detail.includes("有効期限が切れました") || detail.includes("expired")) {
+      return {
+        message: "セッションの有効期限が切れました。再度ログインしてください。",
+        isTokenExpired: true,
+        shouldLogout: true,
+      };
+    }
+
+    if (detail.includes("トークンが無効です") || detail.includes("invalid")) {
+      return {
+        message: "認証情報が無効です。再度ログインしてください。",
+        isTokenExpired: true,
+        shouldLogout: true,
+      };
+    }
+
+    if (detail.includes("ユーザーが見つかりません")) {
+      return {
+        message: "ユーザー情報が見つかりません。再度ログインしてください。",
+        isTokenExpired: false,
+        shouldLogout: true,
+      };
+    }
+
+    return {
+      message: detail || "認証に失敗しました",
+      isTokenExpired: true,
+      shouldLogout: true,
+    };
+  }
+
+  return {
+    message: data?.detail || "エラーが発生しました",
+    isTokenExpired: false,
+    shouldLogout: false,
+  };
+};
 
 // Zustand認証ストアの作成
 export const useAuthStore = create<AuthStore>()(
@@ -52,6 +121,9 @@ export const useAuthStore = create<AuthStore>()(
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        isInitialized: false,
+        isTokenExpired: false, // ✅ 新規追加
+        lastAuthError: null, // ✅ 新規追加
 
         // 基本的な状態操作
         setUser: (user) =>
@@ -65,6 +137,16 @@ export const useAuthStore = create<AuthStore>()(
 
         clearError: () => set({ error: null }, false, "clearError"),
 
+        setInitialized: (isInitialized) =>
+          set({ isInitialized }, false, "setInitialized"),
+
+        // ✅ 新機能: 期限切れ状態管理
+        setTokenExpired: (expired) =>
+          set({ isTokenExpired: expired }, false, "setTokenExpired"),
+
+        setLastAuthError: (error) =>
+          set({ lastAuthError: error }, false, "setLastAuthError"),
+
         // Axiosヘッダー管理
         setAuthHeader: (token) => {
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -74,14 +156,42 @@ export const useAuthStore = create<AuthStore>()(
           delete axios.defaults.headers.common["Authorization"];
         },
 
-        // ✅ 修正: ログイン処理（バックエンドからユーザー情報を取得）
+        // ✅ 新機能: 統一された認証エラーハンドリング
+        handleAuthError: (error) => {
+          const { message, isTokenExpired, shouldLogout } =
+            parseAuthError(error);
+          const { setError, setTokenExpired, setLastAuthError, logout } = get();
+
+          // エラー情報を状態に保存
+          setLastAuthError(message);
+          setTokenExpired(isTokenExpired);
+
+          if (shouldLogout) {
+            // 自動ログアウト（UIコンポーネントで期限切れ状態を監視できる）
+            logout();
+            setError(message);
+            return true; // 認証エラーであることを示す
+          } else {
+            setError(message);
+            return false; // 認証エラーではない
+          }
+        },
+
+        // ログイン処理
         login: async (credentials) => {
-          const { setLoading, setError, setUser, setToken, setAuthHeader } =
-            get();
+          const {
+            setLoading,
+            setError,
+            setUser,
+            setToken,
+            setAuthHeader,
+            setTokenExpired,
+          } = get();
 
           try {
             setLoading(true);
             setError(null);
+            setTokenExpired(false); // ✅ 期限切れ状態をリセット
 
             // FormDataでログインデータを送信（OAuth2PasswordRequestForm対応）
             const formData = new FormData();
@@ -98,13 +208,11 @@ export const useAuthStore = create<AuthStore>()(
               }
             );
 
-            const { access_token, user } = response.data; // ✅ userも取得
+            const { access_token, user } = response.data;
 
             // トークンを保存してヘッダーに設定
             setToken(access_token);
             setAuthHeader(access_token);
-
-            // ✅ 修正: バックエンドから返された実際のユーザー情報を設定
             setUser(user);
           } catch (error: any) {
             console.error("Login failed:", error);
@@ -122,16 +230,22 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
-        // ✅ 修正: 新規登録処理（バックエンドの新しいレスポンス形式に対応）
+        // 新規登録処理
         register: async (userData) => {
-          const { setLoading, setError, setUser, setToken, setAuthHeader } =
-            get();
+          const {
+            setLoading,
+            setError,
+            setUser,
+            setToken,
+            setAuthHeader,
+            setTokenExpired,
+          } = get();
 
           try {
             setLoading(true);
             setError(null);
+            setTokenExpired(false); // ✅ 期限切れ状態をリセット
 
-            // ✅ 修正: 登録APIが直接 TokenWithUser を返すように変更
             const response = await axios.post<AuthResponse>(
               `${API_BASE_URL}/auth/register`,
               userData
@@ -161,69 +275,67 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
-        // ログアウト処理
+        // ✅ 修正: ログアウト処理（状態のリセット強化）
         logout: () => {
-          const { setUser, setToken, clearAuthHeader } = get();
+          const {
+            setUser,
+            setToken,
+            clearAuthHeader,
+            setTokenExpired,
+            setLastAuthError,
+          } = get();
 
           setUser(null);
           setToken(null);
           clearAuthHeader();
+          setTokenExpired(false); // ✅ 期限切れ状態をリセット
+          setLastAuthError(null); // ✅ エラー履歴をクリア
         },
 
-        // ✅ 修正: 現在のユーザー情報を取得（有効化）
+        // ✅ 修正: 現在のユーザー情報を取得（エラーハンドリング強化）
         getCurrentUser: async () => {
-          const { setLoading, setError, setUser, token, logout } = get();
+          const { setLoading, token, handleAuthError } = get();
 
           if (!token) {
-            logout();
+            get().logout();
             return;
           }
 
           try {
             setLoading(true);
-            setError(null);
 
             const response = await axios.get<User>(`${API_BASE_URL}/auth/me`);
-            setUser(response.data);
+            get().setUser(response.data);
           } catch (error: any) {
             console.error("Get current user failed:", error);
 
-            // 401エラー（認証切れ）の場合はログアウト
-            if (error.response?.status === 401) {
-              logout();
-            } else {
-              setError("ユーザー情報の取得に失敗しました");
-            }
+            // ✅ 統一されたエラーハンドリングを使用
+            handleAuthError(error);
           } finally {
             setLoading(false);
           }
         },
 
-        // ✅ 修正: 認証状態確認（シンプル版、無限ループ防止）
         checkAuth: () => {
-          const { token, setAuthHeader, logout, user } = get();
+          const { token, setAuthHeader, logout, user, setInitialized } = get();
 
           if (token) {
-            // トークンが存在する場合、Axiosヘッダーに設定
             setAuthHeader(token);
 
-            // ユーザー情報が存在しない場合のみ警告（デバッグ用）
             if (!user) {
               console.warn(
-                "checkAuth: トークンは存在しますが、ユーザー情報がありません。ログイン時に設定されているはずです。"
+                "checkAuth: トークンは存在しますが、ユーザー情報がありません。"
               );
             }
-
-            // ✅ 重要: getCurrentUserは呼び出さない（無限ループ防止）
-            // 必要に応じて手動でgetCurrentUserを呼び出す
           } else {
             logout();
           }
+
+          setInitialized(true);
         },
       }),
       {
-        name: "auth-store", // localStorage のキー名
-        // トークンとユーザー情報のみ永続化
+        name: "auth-store",
         partialize: (state) => ({
           user: state.user,
           token: state.token,
@@ -232,7 +344,24 @@ export const useAuthStore = create<AuthStore>()(
       }
     ),
     {
-      name: "auth-store", // Redux DevToolsでの表示名
+      name: "auth-store",
     }
   )
 );
+
+// ✅ 新機能: Axiosインターセプター（レスポンス用）
+// グローバルな401エラー処理
+if (typeof window !== "undefined") {
+  axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      // 401エラーの場合は認証ストアで処理
+      if (error.response?.status === 401) {
+        const authStore = useAuthStore.getState();
+        authStore.handleAuthError(error);
+      }
+
+      return Promise.reject(error);
+    }
+  );
+}

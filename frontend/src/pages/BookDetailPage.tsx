@@ -1,6 +1,6 @@
 // src/pages/BookDetailPage.tsx
 
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
@@ -8,9 +8,8 @@ import type { Book, BookUpdate } from "../types/book";
 
 export const BookDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { fetchBookById, updateBookById, isLoading, error } = useBookStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isInitialized } = useAuthStore(); // ✅ isInitializedを追加
 
   const [book, setBook] = useState<Book | null>(null);
   const [localLoading, setLocalLoading] = useState(true);
@@ -19,26 +18,18 @@ export const BookDetailPage = () => {
   // ✅ 新機能: 編集フォームの状態
   const [editForm, setEditForm] = useState<BookUpdate>({});
 
-  // ✅ 修正: useCallbackで関数をメモ化
+  // ✅ 修正: 認証初期化完了後にのみ書籍詳細を取得
   const loadBook = useCallback(async () => {
     if (!id) return;
 
-    // ✅ デバッグ情報を追加
-    console.log("BookDetailPage - 認証状態:", isAuthenticated);
-    console.log("BookDetailPage - 書籍ID:", id);
-
-    if (!isAuthenticated) {
-      console.log("BookDetailPage - 認証されていないため、書籍取得をスキップ");
+    if (!isAuthenticated || !isInitialized) {
+      // ✅ 両方の条件をチェック
       return;
     }
 
     setLocalLoading(true);
-
     const numericId = parseInt(id, 10);
-    console.log("BookDetailPage - 書籍詳細を取得中:", numericId);
-
     const fetched = await fetchBookById(numericId);
-    console.log("BookDetailPage - 取得結果:", fetched);
 
     setBook(fetched);
     // 編集フォームを初期化
@@ -53,7 +44,7 @@ export const BookDetailPage = () => {
       });
     }
     setLocalLoading(false);
-  }, [id, isAuthenticated, fetchBookById]);
+  }, [id, isAuthenticated, isInitialized, fetchBookById]); // ✅ isInitializedを依存配列に追加
 
   useEffect(() => {
     loadBook();
