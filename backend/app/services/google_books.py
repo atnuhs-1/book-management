@@ -1,4 +1,3 @@
-# backend/app/google_books.py
 import os
 import requests
 from dotenv import load_dotenv
@@ -42,9 +41,9 @@ def fetch_book_info_by_isbn(isbn: str):
         "cover_image_url": volume_info.get("imageLinks", {}).get("thumbnail"),
     }
 
-# タイトルから本の情報を取得
+# タイトルから本の情報を取得（あいまい一致強化）
 def search_books_by_title(title: str):
-    url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}"
+    url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}&maxResults=20"
     if API_KEY:
         url += f"&key={API_KEY}"
 
@@ -57,26 +56,12 @@ def search_books_by_title(title: str):
 
     for item in data.get("items", []):
         volume_info = item.get("volumeInfo", {})
-        item_title = volume_info.get("title", "")
-
-        # 「完全一致」に近いものを優先（副題などを含めた柔軟な一致）
-        if title.lower() not in item_title.lower():
-            continue
-
         result = {
-            "title": item_title,
+            "title": volume_info.get("title", ""),
             "authors": volume_info.get("authors", []),
             "publisher": volume_info.get("publisher"),
             "published_date": volume_info.get("publishedDate"),
             "cover_image_url": volume_info.get("imageLinks", {}).get("thumbnail"),
-            # "isbn": next(
-            #     (
-            #         i['identifier']
-            #         for i in volume_info.get("industryIdentifiers", [])
-            #         if i["type"].startswith("ISBN")
-            #     ),
-            #     None
-            # ),
         }
         results.append(result)
 

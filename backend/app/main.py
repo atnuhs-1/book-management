@@ -11,8 +11,7 @@ from app.core.database import Base, engine
 from app.models import user, book
 
 # ルーターのインポート
-from app.routers import user as user_router
-from app.routers import book as book_router
+from app.routers import user_router, book_router, recommendation_router
 
 # 環境変数読み込み
 load_dotenv()
@@ -41,6 +40,6 @@ async def root():
 async def test():
     return {"status": "ok", "message": "API is working"}
 
-# ルーターの登録
-app.include_router(user_router.router, prefix="/api/auth", tags=["auth"])
-app.include_router(book_router.router, prefix="/api", tags=["books"])
+app.include_router(user_router, prefix="/api/auth", tags=["auth"])
+app.include_router(book_router, prefix="/api", tags=["books"])
+app.include_router(recommendation_router, prefix="/api", tags=["recommendations"])
