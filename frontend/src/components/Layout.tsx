@@ -1,8 +1,6 @@
-// src/components/Layout.tsx
-
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,47 +8,77 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const { user, isAuthenticated, logout, isLoading } = useAuthStore(); // ✅ isLoadingを追加
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    isLoading,
+    isTokenExpired,
+    lastAuthError,
+  } = useAuthStore(); // ✅ 認証エラー状態を監視
 
-  // アクティブなナビゲーションリンクのスタイル
-  const getLinkClassName = (path: string) => {
-    const baseClasses =
-      "px-3 py-2 rounded-md text-sm font-medium transition-colors";
-    const isActive = location.pathname === path;
+  const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
+  const mobileUserMenuRef = useRef<HTMLDivElement | null>(null);
 
-    if (isActive) {
-      return `${baseClasses} bg-indigo-600 text-white`;
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mobileUserMenuRef.current &&
+        !mobileUserMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileUserMenuOpen(false);
+      }
+    };
+
+    if (isMobileUserMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
     }
-    return `${baseClasses} text-gray-700 hover:text-indigo-600 hover:bg-indigo-50`;
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMobileUserMenuOpen]);
+
+  const getLinkClassName = (path: string) => {
+    const base = "px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    const isActive = location.pathname === path;
+    return isActive
+      ? `${base} bg-indigo-600 text-white`
+      : `${base} text-gray-700 hover:text-indigo-600 hover:bg-indigo-50`;
   };
 
-  // ログアウト処理
+  const getMobileTabClass = (path: string) => {
+    const isActive = location.pathname === path;
+    return isActive
+      ? "flex flex-col items-center text-sm text-indigo-600 font-semibold"
+      : "flex flex-col items-center text-sm text-gray-700 hover:text-indigo-600";
+  };
+
   const handleLogout = () => {
     logout();
-    setIsMobileMenuOpen(false);
+    setIsMobileUserMenuOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* ヘッダー */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-24">
       <header className="bg-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            {/* ロゴ */}
             <Link to="/" className="flex items-center">
               <h1 className="text-2xl font-bold text-gray-900">
                 📚 Book Management PWA
               </h1>
             </Link>
 
-            {/* デスクトップナビゲーション */}
             <nav className="hidden md:flex space-x-1">
               <Link to="/" className={getLinkClassName("/")}>
                 🏠 ホーム
               </Link>
               <Link to="/books" className={getLinkClassName("/books")}>
                 📖 書籍一覧
+              </Link>
+              <Link to="/wishlist" className={getLinkClassName("/wishlist")}>
+                💫 ウィッシュリスト
               </Link>
               {isAuthenticated && (
                 <Link to="/register" className={getLinkClassName("/register")}>
@@ -62,9 +90,8 @@ export const Layout = ({ children }: LayoutProps) => {
               </Link>
             </nav>
 
-            {/* ユーザー情報・認証ボタン */}
             <div className="flex items-center space-x-4">
-              {/* ✅ 認証ローディング状態の表示 */}
+              {/* ✅ 修正: ローディング状態の詳細表示 */}
               {isLoading && (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
@@ -72,7 +99,16 @@ export const Layout = ({ children }: LayoutProps) => {
                 </div>
               )}
 
-              {/* ステータスバッジ */}
+              {/* ✅ 新機能: 認証エラー状態の視覚的な表示 */}
+              {isTokenExpired && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-red-100 border border-red-300 rounded-md">
+                  <span className="text-red-600 text-sm">⚠️</span>
+                  <span className="text-sm text-red-700 font-medium">
+                    セッション期限切れ
+                  </span>
+                </div>
+              )}
+
               <div className="hidden lg:flex space-x-2">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   PWA対応
@@ -80,24 +116,10 @@ export const Layout = ({ children }: LayoutProps) => {
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   React + Zustand
                 </span>
-                {/* ✅ 認証状態のデバッグ表示（開発用） */}
-                {process.env.NODE_ENV === "development" && (
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      isAuthenticated
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {isAuthenticated ? "認証済み" : "未認証"}
-                  </span>
-                )}
               </div>
 
-              {/* 認証状態による表示切り替え */}
               {isAuthenticated ? (
                 <div className="flex items-center space-x-3">
-                  {/* ユーザー情報 */}
                   <div className="hidden md:block text-right">
                     <p className="text-sm font-medium text-gray-900">
                       {user?.username || "Unknown User"}
@@ -105,22 +127,76 @@ export const Layout = ({ children }: LayoutProps) => {
                     <p className="text-xs text-gray-500">
                       {user?.email || "No Email"}
                     </p>
+                    {/* ✅ 新機能: 認証状態の詳細表示 */}
+                    {isTokenExpired && (
+                      <p className="text-xs text-red-600 font-medium">
+                        再ログインが必要
+                      </p>
+                    )}
                   </div>
 
-                  {/* ユーザーアバター */}
-                  <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">
-                      {user?.username?.charAt(0).toUpperCase() || "?"}
-                    </span>
+                  <div className="md:hidden relative" ref={mobileUserMenuRef}>
+                    <button
+                      onClick={() =>
+                        setIsMobileUserMenuOpen(!isMobileUserMenuOpen)
+                      }
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isTokenExpired
+                          ? "bg-red-600 ring-2 ring-red-300" // ✅ 期限切れ時の視覚効果
+                          : "bg-indigo-600"
+                      }`}
+                    >
+                      <span className="text-white text-sm font-bold">
+                        {user?.username?.charAt(0).toUpperCase() || "?"}
+                      </span>
+                    </button>
+                    {isMobileUserMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-md z-50">
+                        <div className="px-4 py-2 text-sm text-gray-700">
+                          <p>{user?.username || "Unknown User"}</p>
+                          <p className="text-xs text-gray-500">
+                            {user?.email || "No Email"}
+                          </p>
+                          {/* ✅ モバイル版でも認証状態表示 */}
+                          {isTokenExpired && (
+                            <p className="text-xs text-red-600 font-medium mt-1">
+                              ⚠️ 再ログインが必要
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          ログアウト
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* ログアウトボタン */}
-                  <button
-                    onClick={handleLogout}
-                    className="hidden md:block px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    ログアウト
-                  </button>
+                  <div className="hidden md:flex items-center space-x-2">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isTokenExpired
+                          ? "bg-red-600 ring-2 ring-red-300" // ✅ 期限切れ時の視覚効果
+                          : "bg-indigo-600"
+                      }`}
+                    >
+                      <span className="text-white text-sm font-bold">
+                        {user?.username?.charAt(0).toUpperCase() || "?"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className={`px-3 py-1 text-sm border rounded-md transition-colors ${
+                        isTokenExpired
+                          ? "text-red-600 border-red-300 hover:bg-red-50" // ✅ 期限切れ時の色変更
+                          : "text-gray-600 hover:text-gray-800 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {isTokenExpired ? "再ログイン" : "ログアウト"}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="hidden md:flex space-x-2">
@@ -138,110 +214,43 @@ export const Layout = ({ children }: LayoutProps) => {
                   </Link>
                 </div>
               )}
-
-              {/* モバイルメニューボタン */}
-              <div className="md:hidden">
-                <button
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <span className="text-xl">☰</span>
-                </button>
-              </div>
             </div>
           </div>
-
-          {/* モバイルナビゲーション */}
-          {isMobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-200 py-2">
-              <div className="flex flex-col space-y-2">
-                <Link
-                  to="/"
-                  className={getLinkClassName("/")}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  🏠 ホーム
-                </Link>
-                <Link
-                  to="/books"
-                  className={getLinkClassName("/books")}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  📖 書籍一覧
-                </Link>
-                {isAuthenticated && (
-                  <Link
-                    to="/register"
-                    className={getLinkClassName("/register")}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    ➕ 書籍追加
-                  </Link>
-                )}
-                <Link
-                  to="/settings"
-                  className={getLinkClassName("/settings")}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  ⚙️ 設定
-                </Link>
-
-                {/* モバイル認証ボタン */}
-                <div className="border-t border-gray-200 pt-2 mt-2">
-                  {isAuthenticated ? (
-                    <div className="space-y-2">
-                      <div className="px-3 py-2">
-                        <p className="text-sm font-medium text-gray-900">
-                          {user?.username || "Unknown User"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {user?.email || "No Email"}
-                        </p>
-                        {/* ✅ デバッグ情報（開発用） */}
-                        {process.env.NODE_ENV === "development" && (
-                          <p className="text-xs text-blue-500">
-                            ID: {user?.id}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      >
-                        ログアウト
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Link
-                        to="/login"
-                        className="block px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        ログイン
-                      </Link>
-                      <Link
-                        to="/signup"
-                        className="block px-3 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        新規登録
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
-      {/* メインコンテンツ */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-24">
         {children}
       </main>
 
-      {/* フッター */}
+      {/* ボトムナビゲーション */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-md md:hidden">
+        <div className="flex justify-around items-center py-2">
+          <Link to="/" className={getMobileTabClass("/")}>
+            <span className="text-lg">🏠</span>
+            <span className="text-xs">ホーム</span>
+          </Link>
+          <Link to="/books" className={getMobileTabClass("/books")}>
+            <span className="text-lg">📖</span>
+            <span className="text-xs">一覧</span>
+          </Link>
+          <Link to="/wishlist" className={getMobileTabClass("/wishlist")}>
+            <span className="text-lg">💫</span>
+            <span className="text-xs">欲しい本</span>
+          </Link>
+          {isAuthenticated && (
+            <Link to="/register" className={getMobileTabClass("/register")}>
+              <span className="text-lg">➕</span>
+              <span className="text-xs">追加</span>
+            </Link>
+          )}
+          <Link to="/settings" className={getMobileTabClass("/settings")}>
+            <span className="text-lg">⚙️</span>
+            <span className="text-xs">設定</span>
+          </Link>
+        </div>
+      </nav>
+
       <footer className="bg-gray-800 text-white mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
@@ -252,8 +261,6 @@ export const Layout = ({ children }: LayoutProps) => {
             <p className="text-sm text-gray-400 mt-2">
               書籍管理PWA - JWT認証対応 📚
             </p>
-
-            {/* フッターリンク */}
             <div className="mt-4 flex justify-center space-x-6 text-sm">
               <Link
                 to="/terms"

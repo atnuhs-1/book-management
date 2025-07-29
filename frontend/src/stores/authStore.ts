@@ -54,7 +54,7 @@ interface AuthStore {
   handleAuthError: (error: any) => boolean; // 認証エラーかどうかを返す
 }
 
-// ✅ 新機能: エラーメッセージの解析
+// authStore.ts の parseAuthError 関数にログを追加
 const parseAuthError = (
   error: any
 ): { message: string; isTokenExpired: boolean; shouldLogout: boolean } => {
@@ -71,7 +71,7 @@ const parseAuthError = (
   if (status === 401) {
     const detail = data?.detail || "";
 
-    // ✅ バックエンドからの期限切れメッセージを検出
+    // バックエンドからの期限切れメッセージを検出
     if (detail.includes("有効期限が切れました") || detail.includes("expired")) {
       return {
         message: "セッションの有効期限が切れました。再度ログインしてください。",
@@ -156,23 +156,27 @@ export const useAuthStore = create<AuthStore>()(
           delete axios.defaults.headers.common["Authorization"];
         },
 
-        // ✅ 新機能: 統一された認証エラーハンドリング
+        // ✅ 修正: 統一された認証エラーハンドリング
         handleAuthError: (error) => {
           const { message, isTokenExpired, shouldLogout } =
             parseAuthError(error);
+
           const { setError, setTokenExpired, setLastAuthError, logout } = get();
 
-          // エラー情報を状態に保存
+          // ✅ 重要: 先にエラー状態を設定してからログアウト
           setLastAuthError(message);
           setTokenExpired(isTokenExpired);
+          setError(message);
 
           if (shouldLogout) {
-            // 自動ログアウト（UIコンポーネントで期限切れ状態を監視できる）
-            logout();
-            setError(message);
+            // ✅ 修正: ログアウト処理（ユーザー情報とトークンのみクリア）
+            const { setUser, setToken, clearAuthHeader } = get();
+            setUser(null);
+            setToken(null);
+            clearAuthHeader();
+
             return true; // 認証エラーであることを示す
           } else {
-            setError(message);
             return false; // 認証エラーではない
           }
         },
@@ -275,21 +279,23 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
-        // ✅ 修正: ログアウト処理（状態のリセット強化）
         logout: () => {
           const {
             setUser,
             setToken,
             clearAuthHeader,
-            setTokenExpired,
-            setLastAuthError,
+            // ✅ 重要: ログアウト時は認証エラー状態をリセットしない
+            // setTokenExpired,
+            // setLastAuthError,
           } = get();
 
           setUser(null);
           setToken(null);
           clearAuthHeader();
-          setTokenExpired(false); // ✅ 期限切れ状態をリセット
-          setLastAuthError(null); // ✅ エラー履歴をクリア
+
+          // ✅ 重要: 期限切れ状態は保持（UIで表示するため）
+          // setTokenExpired(false);
+          // setLastAuthError(null);
         },
 
         // ✅ 修正: 現在のユーザー情報を取得（エラーハンドリング強化）
@@ -349,16 +355,19 @@ export const useAuthStore = create<AuthStore>()(
   )
 );
 
-// ✅ 新機能: Axiosインターセプター（レスポンス用）
-// グローバルな401エラー処理
+// authStore.ts の最下部のAxiosインターセプター部分
 if (typeof window !== "undefined") {
   axios.interceptors.response.use(
     (response) => response,
     (error) => {
+
       // 401エラーの場合は認証ストアで処理
       if (error.response?.status === 401) {
         const authStore = useAuthStore.getState();
-        authStore.handleAuthError(error);
+        const result = authStore.handleAuthError(error);
+        console.log("✅ authStore.handleAuthError完了:", result);
+      } else {
+        console.log("❌ 401以外のエラー:", error.response?.status);
       }
 
       return Promise.reject(error);

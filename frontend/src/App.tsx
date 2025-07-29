@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -13,12 +13,74 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { TermsPage } from "./pages/TermsPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { WishlistPage } from "./pages/WishlistPage";
 import { useAuthStore } from "./stores/authStore";
+
+// ✅ 新機能: グローバル認証エラー通知コンポーネント
+const AuthErrorNotification = () => {
+  // ✅ 修正: 個別に状態を取得してReactの再レンダリングを確実にトリガー
+  const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
+  const lastAuthError = useAuthStore((state) => state.lastAuthError);
+  const setTokenExpired = useAuthStore((state) => state.setTokenExpired);
+  const setLastAuthError = useAuthStore((state) => state.setLastAuthError);
+
+  const [showNotification, setShowNotification] = useState(false);
+
+  // ✅ デバッグ用ログ追加
+  useEffect(() => {
+    if (isTokenExpired && lastAuthError) {
+      setShowNotification(true);
+    }
+  }, [isTokenExpired, lastAuthError]);
+
+  const handleClose = () => {
+    setShowNotification(false);
+    setTokenExpired(false);
+    setLastAuthError(null);
+  };
+
+  const handleLoginRedirect = () => {
+    handleClose();
+    // React Routerでリダイレクト（window.locationの代わり）
+    window.location.href = "/login";
+  };
+
+  if (!showNotification) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-4 shadow-lg">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <div>
+            <h4 className="font-semibold">セッション期限切れ</h4>
+            <p className="text-sm text-red-100">{lastAuthError}</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleLoginRedirect}
+            className="bg-white text-red-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
+          >
+            ログイン
+          </button>
+          <button
+            onClick={handleClose}
+            className="text-red-100 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const { checkAuth, isLoading } = useAuthStore();
 
-  // ✅ 修正: 依存配列を空にして初回のみ実行
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -29,9 +91,8 @@ function App() {
     };
 
     initializeAuth();
-  }, []); // ✅ 空の依存配列に変更
+  }, []);
 
-  // ✅ 認証チェック中はローディング表示
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -45,6 +106,9 @@ function App() {
 
   return (
     <Router>
+      {/* ✅ 新機能: グローバル認証エラー通知 */}
+      <AuthErrorNotification />
+
       <Routes>
         {/* 認証不要のページ */}
         <Route path="/login" element={<LoginPage />} />
@@ -62,6 +126,7 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/books" element={<BooksPage />} />
                 <Route path="/books/:id" element={<BookDetailPage />} />
+                <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
 
                 {/* 認証が必要なページ */}
