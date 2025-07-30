@@ -356,6 +356,7 @@ export const Layout = ({ children }: LayoutProps) => {
                   { id: "/food-list", label: "一覧", emoji: "🍎" },
                   { id: "/expiry", label: "期限管理", emoji: "📅" },
                   { id: "/add-food", label: "追加", emoji: "➕" },
+                  { id: "/recipes", label: "レシピ", emoji: "🔪" },
                 ].map((item) => (
                   <button
                     key={item.id}

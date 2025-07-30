@@ -1,8 +1,8 @@
-// src/pages/FoodPages.tsx - 食品管理ページ群
+// src/pages/FoodPages.tsx
+
 import { useState } from "react";
 import { GlassCard, GlassInput } from "../components/ui/GlassUI";
 
-// 仮データ
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️", count: 89 },
   { id: "fresh", name: "生鮮食品", icon: "🥬", count: 23 },
@@ -70,14 +70,19 @@ const sampleFoodItems = [
   },
 ];
 
-export const FoodListPage = () => {
+export const FoodPage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showModal, setShowModal] = useState(false);
 
   const filteredItems = sampleFoodItems.filter(
     (item) =>
       (selectedCategory === "all" || item.category === selectedCategory) &&
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const currentCategory = foodCategories.find(
+    (cat) => cat.id === selectedCategory
   );
 
   return (
@@ -93,8 +98,21 @@ export const FoodListPage = () => {
         />
       </div>
 
-      {/* カテゴリフィルター */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+      {/* ✅ モバイル用：カテゴリモーダル起動ボタン */}
+      <div className="sm:hidden">
+        <button
+          onClick={() => setShowModal(true)}
+          className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white/30 backdrop-blur shadow flex items-center justify-between text-sm text-gray-700"
+        >
+          <span>
+            {currentCategory?.icon} {currentCategory?.name}
+          </span>
+          <span className="text-xs text-gray-500">カテゴリ変更 ⬇️</span>
+        </button>
+      </div>
+
+      {/* ✅ PC用：従来のカテゴリボタン */}
+      <div className="hidden sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-4">
         {foodCategories.map((category) => (
           <button
             key={category.id}
@@ -114,6 +132,42 @@ export const FoodListPage = () => {
         ))}
       </div>
 
+      {/* ✅ モーダル */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-lg font-medium text-gray-800 mb-2 text-center">
+              カテゴリを選択
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {foodCategories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => {
+                    setSelectedCategory(category.id);
+                    setShowModal(false);
+                  }}
+                  className={`p-3 border rounded-xl text-center text-sm transition ${
+                    selectedCategory === category.id
+                      ? "bg-indigo-100 border-indigo-300 text-indigo-700"
+                      : "bg-white hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="text-xl mb-1">{category.icon}</div>
+                  <div>{category.name}</div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowModal(false)}
+              className="block w-full mt-4 text-sm text-gray-500 hover:text-gray-700 text-center"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 食品一覧 */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => (
@@ -130,8 +184,8 @@ export const FoodListPage = () => {
                   item.status === "expired"
                     ? "bg-red-400"
                     : item.status === "expiring"
-                      ? "bg-amber-400"
-                      : "bg-green-400"
+                    ? "bg-amber-400"
+                    : "bg-green-400"
                 }`}
               ></div>
             </div>
@@ -162,85 +216,6 @@ export const FoodListPage = () => {
           <p className="text-gray-600">別のキーワードで検索してみてください</p>
         </div>
       )}
-    </div>
-  );
-};
-
-// src/pages/ExpiryPage.tsx - 期限管理ページ
-export const ExpiryPage = () => {
-  const expiredItems = sampleFoodItems.filter(
-    (item) => item.status === "expired"
-  );
-  const expiringItems = sampleFoodItems.filter(
-    (item) => item.status === "expiring"
-  );
-
-  return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <h1 className="text-4xl font-light text-gray-800">期限管理</h1>
-
-      {/* 期限切れ */}
-      <GlassCard className="p-6">
-        <h2 className="text-2xl font-light text-red-600 mb-4 flex items-center">
-          <span className="mr-2">🚨</span>
-          期限切れ ({expiredItems.length}件)
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {expiredItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-red-50/50 backdrop-blur-sm rounded-xl p-4 border border-red-200/30"
-            >
-              <h3 className="font-medium text-red-800">{item.name}</h3>
-              <p className="text-sm text-red-600">期限: {item.expiryDate}</p>
-              <p className="text-sm text-gray-600">
-                {item.quantity} {item.unit}
-              </p>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-
-      {/* 期限間近 */}
-      <GlassCard className="p-6">
-        <h2 className="text-2xl font-light text-amber-600 mb-4 flex items-center">
-          <span className="mr-2">⚠️</span>
-          期限間近 ({expiringItems.length}件)
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {expiringItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-amber-50/50 backdrop-blur-sm rounded-xl p-4 border border-amber-200/30"
-            >
-              <h3 className="font-medium text-amber-800">{item.name}</h3>
-              <p className="text-sm text-amber-600">期限: {item.expiryDate}</p>
-              <p className="text-sm text-gray-600">
-                {item.quantity} {item.unit}
-              </p>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-    </div>
-  );
-};
-
-// src/pages/AddFoodPage.tsx - 食品追加ページ
-export const AddFoodPage = () => {
-  return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-4xl font-light text-gray-800 mb-8">食品追加</h1>
-
-      <GlassCard className="p-8">
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4 opacity-50">➕</div>
-          <h3 className="text-xl font-light text-gray-800 mb-2">
-            食品追加機能
-          </h3>
-          <p className="text-gray-600">新しい食品を登録する機能は開発中です</p>
-        </div>
-      </GlassCard>
     </div>
   );
 };
