@@ -98,7 +98,15 @@ export const Layout = ({ children }: LayoutProps) => {
           { label: "ホーム", path: "/" },
           { label: "食品一覧", path: "/food-list" },
           { label: "食品追加", path: "/add-food" },
-        ];
+        ];  
+      
+      case "/recipes":
+        return [
+          { label: "ホーム", path: "/" },
+          { label: "食品一覧", path: "/food-list" },
+          { label: "レシピ提案", path: "/recipes" },
+        ];  
+        
       case "/book-list":
         return [
           { label: "ホーム", path: "/" },
@@ -348,7 +356,8 @@ export const Layout = ({ children }: LayoutProps) => {
         {/* サブナビゲーション */}
         {(location.pathname.startsWith("/food") ||
           location.pathname === "/expiry" ||
-          location.pathname === "/add-food") && (
+          location.pathname === "/add-food" ||  
+          location.pathname === "/recipes" ) && (
           <div className="max-w-6xl mx-auto mb-6">
             <div className="bg-white/20 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
               <div className="flex gap-2 overflow-x-auto">
