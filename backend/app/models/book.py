@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from enum import Enum as PyEnum
 
-# ✅ 標準的な大文字の属性名を維持
+# ✅ 小文字の値を使うEnum（DBにも小文字で保存される）
 class BookStatusEnum(PyEnum):
     OWNED = "owned"
     WISHLIST = "wishlist"
@@ -20,15 +20,15 @@ class Book(Base):
     cover_image_url = Column(String)
     published_date = Column(Date)
 
-    # ✅ SQLAlchemyに値を使用するよう明示的に指定
     status = Column(
-        SqlEnum(BookStatusEnum,
-               name="bookstatusenum",
-               values_callable=lambda x: [e.value for e in x]),
+        SqlEnum(
+            BookStatusEnum,
+            name="bookstatusenum",  # PostgreSQL上のEnum型名
+            values_callable=lambda enum_cls: [e.value for e in enum_cls]  # DBに小文字で保存
+        ),
         default=BookStatusEnum.OWNED,
         nullable=False
     )
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # リレーションシップ
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="books")
