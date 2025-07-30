@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx - ルーティング追加版
 
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
@@ -16,9 +16,12 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { WishlistPage } from "./pages/WishlistPage";
 import { useAuthStore } from "./stores/authStore";
 
+// ✅ 新規追加: 食品管理関連ページ
+import { FoodListPage, ExpiryPage, AddFoodPage } from "./pages/FoodPages";
+import { AddBookPage } from "./pages/AddBookPage";
+
 // ✅ 新機能: グローバル認証エラー通知コンポーネント
 const AuthErrorNotification = () => {
-  // ✅ 修正: 個別に状態を取得してReactの再レンダリングを確実にトリガー
   const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
   const lastAuthError = useAuthStore((state) => state.lastAuthError);
   const setTokenExpired = useAuthStore((state) => state.setTokenExpired);
@@ -26,7 +29,6 @@ const AuthErrorNotification = () => {
 
   const [showNotification, setShowNotification] = useState(false);
 
-  // ✅ デバッグ用ログ追加
   useEffect(() => {
     if (isTokenExpired && lastAuthError) {
       setShowNotification(true);
@@ -41,7 +43,6 @@ const AuthErrorNotification = () => {
 
   const handleLoginRedirect = () => {
     handleClose();
-    // React Routerでリダイレクト（window.locationの代わり）
     window.location.href = "/login";
   };
 
@@ -106,7 +107,7 @@ function App() {
 
   return (
     <Router>
-      {/* ✅ 新機能: グローバル認証エラー通知 */}
+      {/* ✅ グローバル認証エラー通知 */}
       <AuthErrorNotification />
 
       <Routes>
@@ -124,9 +125,21 @@ function App() {
               <Routes>
                 {/* 公開ページ */}
                 <Route path="/" element={<HomePage />} />
+
+                {/* 書籍管理関連 */}
                 <Route path="/books" element={<BooksPage />} />
+                <Route path="/book-list" element={<BooksPage />} />
                 <Route path="/books/:id" element={<BookDetailPage />} />
+                <Route path="/book-detail/:id" element={<BookDetailPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
+                <Route path="/add-book" element={<AddBookPage />} />
+
+                {/* 食品管理関連 */}
+                <Route path="/food" element={<FoodListPage />} />
+                <Route path="/food-list" element={<FoodListPage />} />
+                <Route path="/expiry" element={<ExpiryPage />} />
+                <Route path="/add-food" element={<AddFoodPage />} />
+
                 <Route path="/settings" element={<SettingsPage />} />
 
                 {/* 認証が必要なページ */}
