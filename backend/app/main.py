@@ -15,6 +15,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.database import Base, engine
+
+# モデルを明示的にインポート（テーブル作成のため）
+from app.models import user, book
+
+# ルーターのインポート
+from app.routers import user_router, book_router, recommendation_router
+
 # 環境変数読み込み
 load_dotenv()
 
@@ -46,6 +54,7 @@ async def test():
 app.include_router(user_router, prefix="/api/auth", tags=["auth"])
 app.include_router(book_router, prefix="/api", tags=["books"])
 app.include_router(emergency_router)
+app.include_router(recommendation_router, prefix="/api", tags=["recommendations"])
 
 #start_expiration_check_loop()
 

@@ -3,187 +3,384 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import axios from "axios";
-import type { Book, BookCreate, GoogleBookInfo } from "../types/book";
+import type {
+  Book,
+  BookCreate,
+  BookUpdate,
+  GoogleBookInfo,
+} from "../types/book";
 
-// APIのベースURL
 const API_BASE_URL = "http://localhost:8000/api";
 
-// ストアの状態の型定義
 interface BookStore {
-  // 状態
   books: Book[];
   isLoading: boolean;
   error: string | null;
   searchQuery: string;
-
-  // Google Books 検索関連の状態
   searchResults: GoogleBookInfo[];
   isSearching: boolean;
-
-  // 書籍詳細関連
   selectedBook: Book | null;
 
-  // アクション
+  // ✅ 新機能: 認証関連エラーの状態
+  lastAuthError: string | null;
+  hasAuthError: boolean;
+
   setBooks: (books: Book[]) => void;
   addBook: (book: Book) => void;
+  updateBook: (updatedBook: Book) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setSearchQuery: (query: string) => void;
 
-  // Google Books検索関連のアクション
   setSearchResults: (results: GoogleBookInfo[]) => void;
   setSearching: (searching: boolean) => void;
   clearSearchResults: () => void;
 
-  // 書籍詳細関連のアクション
   setSelectedBook: (book: Book | null) => void;
   getBookById: (id: number) => Book | null;
 
-  // API関連アクション
+  // ✅ 新機能: 認証エラー管理
+  setAuthError: (error: string | null) => void;
+  clearAuthError: () => void;
+
   fetchBooks: () => Promise<void>;
+  fetchBookById: (id: number) => Promise<Book | null>;
   createBook: (bookData: BookCreate) => Promise<void>;
+  updateBookById: (id: number, updateData: BookUpdate) => Promise<void>;
+
+  // 外部API（認証不要）
   fetchBookByISBN: (isbn: string) => Promise<GoogleBookInfo | null>;
   searchBooksByTitle: (title: string) => Promise<GoogleBookInfo[]>;
 }
 
-// Zustandストアの作成
+// ✅ 改良版: エラーメッセージの詳細な判定
+const formatErrorMessage = (
+  error: any
+): { message: string; isAuthError: boolean } => {
+  if (typeof error === "string") {
+    return { message: error, isAuthError: false };
+  }
+
+  // ネットワークエラー
+  if (!error.response) {
+    return {
+      message:
+        "ネットワークエラーが発生しました。インターネット接続を確認してください。",
+      isAuthError: false,
+    };
+  }
+
+  const { status, data } = error.response;
+
+  // HTTPステータスコード別の詳細メッセージ
+  switch (status) {
+    case 401:
+      const detail = data?.detail || "";
+
+      // ✅ バックエンドからの期限切れメッセージを検出
+      if (
+        detail.includes("有効期限が切れました") ||
+        detail.includes("expired")
+      ) {
+        return {
+          message:
+            "セッションの有効期限が切れました。再度ログインしてください。",
+          isAuthError: true,
+        };
+      }
+
+      if (
+        detail.includes("認証情報が無効です") ||
+        detail.includes("トークンが無効です")
+      ) {
+        return {
+          message: "認証情報が無効です。ログインし直してください。",
+          isAuthError: true,
+        };
+      }
+
+      if (detail.includes("ユーザーが見つかりません")) {
+        return {
+          message: "ユーザー情報が見つかりません。再度ログインしてください。",
+          isAuthError: true,
+        };
+      }
+
+      return {
+        message: detail || "認証に失敗しました。ログインしてください。",
+        isAuthError: true,
+      };
+
+    case 403:
+      return {
+        message: "この操作を行う権限がありません。",
+        isAuthError: false,
+      };
+
+    case 404:
+      return {
+        message: "書籍が見つかりません。削除された可能性があります。",
+        isAuthError: false,
+      };
+
+    case 422:
+      // FastAPIのバリデーションエラー
+      if (Array.isArray(data?.detail)) {
+        const validationErrors = data.detail
+          .map((e: any) => {
+            const field = e.loc?.join(".");
+            const message = e.msg;
+            return `${field}: ${message}`;
+          })
+          .join(", ");
+        return {
+          message: `入力エラー: ${validationErrors}`,
+          isAuthError: false,
+        };
+      }
+      return {
+        message: "入力データに問題があります。",
+        isAuthError: false,
+      };
+
+    case 500:
+      return {
+        message:
+          "サーバーエラーが発生しました。しばらく待ってから再試行してください。",
+        isAuthError: false,
+      };
+
+    default:
+      // カスタムメッセージがある場合
+      if (data?.detail) {
+        if (typeof data.detail === "string") {
+          return { message: data.detail, isAuthError: false };
+        }
+      }
+      return {
+        message: `エラーが発生しました (${status})`,
+        isAuthError: false,
+      };
+  }
+};
+
+// ✅ 新機能: 認証エラーをAuthStoreに委譲
+const handleAuthenticationError = (error: any): boolean => {
+  if (error.response?.status === 401) {
+    // authStoreがAxiosインターセプターで自動処理するため、ここでは何もしない
+    return true; // 認証エラーが検出されたことを示す
+  }
+  return false;
+};
+
 export const useBookStore = create<BookStore>()(
-  devtools(
-    (set, get) => ({
-      // 初期状態
-      books: [],
-      isLoading: false,
-      error: null,
-      searchQuery: "",
+  devtools((set, get) => ({
+    books: [],
+    isLoading: false,
+    error: null,
+    searchQuery: "",
+    searchResults: [],
+    isSearching: false,
+    selectedBook: null,
+    lastAuthError: null, // ✅ 新規追加
+    hasAuthError: false, // ✅ 新規追加
 
-      // 基本的な状態操作
-      setBooks: (books) => set({ books }),
-      addBook: (book) =>
+    setBooks: (books) => set({ books }),
+    addBook: (book) => set((state) => ({ books: [...state.books, book] })),
+
+    updateBook: (updatedBook) =>
+      set((state) => ({
+        books: state.books.map((book) =>
+          book.id === updatedBook.id ? updatedBook : book
+        ),
+      })),
+
+    setLoading: (loading) => set({ isLoading: loading }),
+    setError: (error) => set({ error }),
+    setSearchQuery: (query) => set({ searchQuery: query }),
+
+    setSearchResults: (results) => set({ searchResults: results }),
+    setSearching: (searching) => set({ isSearching: searching }),
+    clearSearchResults: () => set({ searchResults: [] }),
+
+    setSelectedBook: (book) => set({ selectedBook: book }),
+    getBookById: (id) => {
+      const { books } = get();
+      return books.find((b) => b.id === id) || null;
+    },
+
+    // ✅ 新機能: 認証エラー管理
+    setAuthError: (error) =>
+      set({ lastAuthError: error, hasAuthError: !!error }),
+    clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
+
+    // ✅ 改良版: 書籍一覧取得（認証エラー処理強化）
+    fetchBooks: async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const response = await axios.get(`${API_BASE_URL}/me/books`);
+        set({ books: response.data, isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
+      } catch (err: any) {
+        console.error("書籍取得エラー:", err);
+
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          // Axiosインターセプターが自動でAuthStoreを処理するため、
+          // ここではエラーメッセージを設定しない
+          set({ isLoading: false });
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+            books: [],
+          });
+        }
+      }
+    },
+
+    // ✅ 改良版: 書籍詳細取得（認証エラー処理強化）
+    fetchBookById: async (id: number) => {
+      set({ isLoading: true, error: null });
+      try {
+        const response = await axios.get(`${API_BASE_URL}/books/${id}`);
+        set({ isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
+        return response.data;
+      } catch (err: any) {
+        console.error("書籍詳細取得エラー:", err);
+
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+        } else {
+          // ✅ 通常のエラーの場合
+          set({ error: message, isLoading: false });
+        }
+        return null;
+      }
+    },
+
+    // ✅ 改良版: 書籍作成（認証エラー処理強化）
+    createBook: async (bookData) => {
+      set({ isLoading: true, error: null });
+      try {
+        const response = await axios.post(`${API_BASE_URL}/books`, bookData);
         set((state) => ({
-          books: [...state.books, book],
-        })),
-      setLoading: (isLoading) => set({ isLoading }),
-      setError: (error) => set({ error }),
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
+          books: [...state.books, response.data],
+          isLoading: false,
+        }));
 
-      // Google Books検索関連
-      setSearchResults: (searchResults) => set({ searchResults }),
-      setSearching: (isSearching) => set({ isSearching }),
-      clearSearchResults: () => set({ searchResults: [] }),
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
+      } catch (err: any) {
+        console.error("書籍作成エラー:", err);
 
-      // 書籍詳細関連
-      setSelectedBook: (selectedBook) => set({ selectedBook }),
-      getBookById: (id) => {
-        const { books } = get();
-        return books.find((book) => book.id === id) || null;
-      },
+        const { message, isAuthError } = formatErrorMessage(err);
 
-      // 書籍一覧を取得
-      fetchBooks: async () => {
-        const { setLoading, setError, setBooks } = get();
-
-        try {
-          setLoading(true);
-          setError(null);
-
-          const response = await axios.get<Book[]>(`${API_BASE_URL}/books`);
-          setBooks(response.data);
-        } catch (error) {
-          console.error("Failed to fetch books:", error);
-          setError("書籍データの取得に失敗しました");
-        } finally {
-          setLoading(false);
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+          throw new Error("認証が必要です");
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+          });
+          throw new Error(message);
         }
-      },
+      }
+    },
 
-      // 書籍を新規作成
-      createBook: async (bookData) => {
-        const { setLoading, setError, addBook } = get();
+    // ✅ 改良版: 書籍更新（認証エラー処理強化）
+    updateBookById: async (id: number, updateData: BookUpdate) => {
+      set({ isLoading: true, error: null });
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/books/${id}`,
+          updateData
+        );
 
-        try {
-          setLoading(true);
-          setError(null);
+        // ローカル状態を更新
+        const { updateBook } = get();
+        updateBook(response.data);
 
-          const response = await axios.post<Book>(
-            `${API_BASE_URL}/books`,
-            bookData
-          );
-          addBook(response.data);
-        } catch (error) {
-          console.error("Failed to create book:", error);
-          setError("書籍の作成に失敗しました");
-          throw error;
-        } finally {
-          setLoading(false);
+        set({ isLoading: false });
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
+      } catch (err: any) {
+        console.error("書籍更新エラー:", err);
+
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isLoading: false });
+          throw new Error("認証が必要です");
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isLoading: false,
+          });
+          throw new Error(message);
         }
-      },
+      }
+    },
 
-      // ISBNから書籍情報を取得
-      fetchBookByISBN: async (isbn) => {
-        const { setLoading, setError } = get();
+    // 外部API（認証不要）- 変更なし
+    fetchBookByISBN: async (isbn: string) => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/fetch_book/${isbn}`);
+        return response.data;
+      } catch (err: any) {
+        const { message } = formatErrorMessage(err);
+        console.error("ISBN検索エラー:", err);
 
-        try {
-          setLoading(true);
-          setError(null);
+        set({ error: message });
+        return null;
+      }
+    },
 
-          const response = await axios.get<GoogleBookInfo>(
-            `${API_BASE_URL}/fetch_book/${isbn}`
-          );
-          return response.data;
-        } catch (error) {
-          console.error("Failed to fetch book by ISBN:", error);
-          setError("ISBN検索に失敗しました");
-          return null;
-        } finally {
-          setLoading(false);
-        }
-      },
+    searchBooksByTitle: async (title: string) => {
+      set({ isSearching: true, error: null });
+      try {
+        const response = await axios.get(`${API_BASE_URL}/search_book`, {
+          params: { title },
+        });
+        set({ searchResults: response.data, isSearching: false });
+        return response.data;
+      } catch (err: any) {
+        const { message } = formatErrorMessage(err);
+        console.error("書籍検索エラー:", err);
 
-      // タイトルで書籍を検索
-      searchBooksByTitle: async (title) => {
-        const { setLoading, setError } = get();
-
-        try {
-          setLoading(true);
-          setError(null);
-
-          const response = await axios.get<GoogleBookInfo[]>(
-            `${API_BASE_URL}/search_book`,
-            {
-              params: { title },
-            }
-          );
-          return response.data;
-        } catch (error) {
-          console.error("Failed to search books by title:", error);
-          setError("タイトル検索に失敗しました");
-          return [];
-        } finally {
-          setLoading(false);
-        }
-      },
-
-      // Google Booksからウィッシュリストに追加
-      // addBookToWishlist: async (googleBook) => {
-      //   const { createBook } = get();
-
-      //   // GoogleBookInfo を BookCreate 形式に変換（ステータスをwishlistに）
-      //   const bookData: BookCreate = {
-      //     title: googleBook.title || "不明なタイトル",
-      //     volume: "",
-      //     author: googleBook.authors || "不明な著者",
-      //     publisher: googleBook.publisher || "不明な出版社",
-      //     cover_image_url: googleBook.cover_image_url || "",
-      //     published_date:
-      //       googleBook.published_date || new Date().toISOString().split("T")[0],
-      //     status: "wishlist", // ウィッシュリストとして追加
-      //   };
-
-      //   await createBook(bookData);
-      // },
-    }),
-    {
-      name: "book-store", // Redux DevToolsでの表示名
-    }
-  )
+        set({
+          error: message,
+          isSearching: false,
+          searchResults: [],
+        });
+        return [];
+      }
+    },
+  }))
 );
+
+// デバッグ用（開発環境のみ）
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  (window as any).bookStore = useBookStore;
+}

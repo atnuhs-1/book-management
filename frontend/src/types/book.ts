@@ -9,7 +9,8 @@ export interface Book {
   author: string;
   publisher: string;
   cover_image_url: string;
-  published_date: string; // バックエンドはdate型だが、JSONでは文字列として受信
+  published_date: string;
+  user_id: number;
 }
 
 export interface BookCreate {
@@ -19,15 +20,27 @@ export interface BookCreate {
   publisher: string;
   cover_image_url: string;
   published_date: string;
+  // user_id: number; ✅ 削除：バックエンドで自動設定される
 }
 
-// Google Books APIのレスポンス型
+// ✅ 新規追加: 書籍更新用の型（任意のフィールドを更新可能）
+export interface BookUpdate {
+  title?: string;
+  volume?: string;
+  author?: string;
+  publisher?: string;
+  cover_image_url?: string;
+  published_date?: string;
+  // user_idは更新不可（セキュリティ上の理由）
+}
+
 export interface GoogleBookInfo {
   title: string;
-  authors: string;
+  volume: string;
+  author: string;
   publisher: string;
-  published_date: string;
   cover_image_url: string;
+  published_date: string;
 }
 
 // API関連の型

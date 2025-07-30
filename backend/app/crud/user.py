@@ -1,6 +1,8 @@
 from app.core.database import SessionLocal
 from app.models.user import User
 from passlib.context import CryptContext
+from app.core.auth import hash_password
+from app.schemas.user import UserCreate
 from sqlalchemy.orm import Session
 
 
@@ -13,10 +15,6 @@ def check_users_table_exists(db: Session):
         return {"exists": True, "count": count}
     except Exception as e:
         return {"exists": False, "error": str(e)}
-
-from app.core.auth import hash_password
-from app.schemas.user import UserCreate
-
 
 def get_user_by_username(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
