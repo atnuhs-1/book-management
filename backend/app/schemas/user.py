@@ -1,4 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from typing import Annotated, Optional
+
+from pydantic import BaseModel, EmailStr, StringConstraints
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -23,3 +26,14 @@ class TokenWithUser(BaseModel):
     access_token: str
     token_type: str
     user: UserOut
+
+
+class UpdateUserRequest(BaseModel):
+    username: Optional[str]
+    email: Optional[EmailStr]
+    full_name: Optional[str]
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: Annotated[str, StringConstraints(min_length=6)]
+    new_password: Annotated[str, StringConstraints(min_length=6)]
