@@ -42,7 +42,7 @@ def start_scheduler():
     scheduler.add_job(
         notify_upcoming_books,
         trigger="cron",
-        hour=15,
-        minute=36
+        hour=0,
+        minute=0
     )
     scheduler.start()
