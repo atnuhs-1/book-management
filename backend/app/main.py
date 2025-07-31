@@ -1,17 +1,15 @@
 # backend/app/main.py
 
 import os
-from dotenv import load_dotenv
 
+from app.core.database import Base, engine
+# モデルを明示的にインポート（テーブル作成のため）
+from app.models import book, user
+# ルーターのインポート
+from app.routers import book_router, recommendation_router, user_router
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.database import Base, engine
-
-# モデルを明示的にインポート（テーブル作成のため）
-from app.models import user, book
-
-# ルーターのインポート
-from app.routers import user_router, book_router, recommendation_router
 
 # 環境変数読み込み
 load_dotenv()
@@ -43,3 +41,17 @@ async def test():
 app.include_router(user_router, prefix="/api/auth", tags=["auth"])
 app.include_router(book_router, prefix="/api", tags=["books"])
 app.include_router(recommendation_router, prefix="/api", tags=["recommendations"])
+
+
+from app.routers import \
+    notification as notification_router  # ← 名前衝突避けるならこう書いてもOK
+from app.services.notification.wishlist import start_scheduler
+
+
+# スケジューラーを起動（FastAPI起動時）
+@app.on_event("startup")
+async def startup_event():
+    start_scheduler()
+
+# 通知APIをルーティングに追加
+app.include_router(notification_router.router, prefix="/api", tags=["notifications"])

@@ -2,14 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 import re
+from typing import List
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import book as crud_book
-from app.models.user import User
 from app.models.book import BookStatusEnum
 from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
 from app.services.google_books import fetch_book_info_by_isbn, search_books_by_title
+from app.models.notification import Notification
+from app.models.user import User
 
 router = APIRouter()
 
@@ -79,6 +81,7 @@ def register_book_by_isbn(
     return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
 
 # その他のエンドポイント（省略なし）
+
 @router.get("/me/books", response_model=list[BookOut])
 def get_my_books(
     db: Session = Depends(get_db),
