@@ -9,6 +9,7 @@ import type {
   BookUpdate,
   GoogleBookInfo,
 } from "../types/book";
+import { mockRegisterBookByISBN } from "../services/mockBookApi";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -20,6 +21,9 @@ interface BookStore {
   searchResults: GoogleBookInfo[];
   isSearching: boolean;
   selectedBook: Book | null;
+  // ✅ 新規追加: バーコード関連の状態
+  isRegisteringByISBN: boolean;
+  lastScannedISBN: string | null;
 
   // ✅ 新機能: 認証関連エラーの状態
   lastAuthError: string | null;
@@ -38,6 +42,11 @@ interface BookStore {
 
   setSelectedBook: (book: Book | null) => void;
   getBookById: (id: number) => Book | null;
+
+  // ✅ 新規追加: バーコード関連のアクション
+  setRegisteringByISBN: (registering: boolean) => void;
+  setLastScannedISBN: (isbn: string | null) => void;
+  createBookByISBN: (isbn: string) => Promise<Book>;
 
   // ✅ 新機能: 認証エラー管理
   setAuthError: (error: string | null) => void;
@@ -184,6 +193,9 @@ export const useBookStore = create<BookStore>()(
     selectedBook: null,
     lastAuthError: null, // ✅ 新規追加
     hasAuthError: false, // ✅ 新規追加
+    // ✅ 新規追加: バーコード関連の初期状態
+    isRegisteringByISBN: false,
+    lastScannedISBN: null,
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
@@ -208,6 +220,12 @@ export const useBookStore = create<BookStore>()(
       const { books } = get();
       return books.find((b) => b.id === id) || null;
     },
+
+    // ✅ 新規追加: バーコード関連のアクション
+    setRegisteringByISBN: (registering) =>
+      set({ isRegisteringByISBN: registering }),
+
+    setLastScannedISBN: (isbn) => set({ lastScannedISBN: isbn }),
 
     // ✅ 新機能: 認証エラー管理
     setAuthError: (error) =>
@@ -305,6 +323,82 @@ export const useBookStore = create<BookStore>()(
       }
     },
 
+    // ✅ 新規追加: ISBNによる書籍登録機能
+    createBookByISBN: async (isbn: string) => {
+      console.log(`📚 createBookByISBN開始: ${isbn}`);
+
+      set({
+        isRegisteringByISBN: true,
+        error: null,
+        lastScannedISBN: isbn,
+      });
+
+      try {
+        let registeredBook: Book;
+
+        // 🚧 開発環境判定とモック使用の切り替え
+        const isDevelopment = import.meta.env.DEV;
+        const useMockAPI = isDevelopment && !import.meta.env.VITE_USE_REAL_API;
+
+        if (useMockAPI) {
+          console.log("🧪 Mock API使用: ISBN登録");
+
+          // モックAPIを使用
+          registeredBook = await mockRegisterBookByISBN(isbn);
+
+          // ローカル状態に追加（モック用）
+          set((state) => ({
+            books: [...state.books, registeredBook],
+            isRegisteringByISBN: false,
+          }));
+
+          console.log("✅ Mock API: 書籍登録完了", registeredBook);
+        } else {
+          console.log("🌐 Real API使用: ISBN登録");
+
+          // 実際のバックエンドAPIを使用
+          const response = await axios.post(
+            `${API_BASE_URL}/books/register-by-isbn`,
+            {
+              isbn,
+            }
+          );
+
+          registeredBook = response.data.book || response.data;
+
+          set((state) => ({
+            books: [...state.books, registeredBook],
+            isRegisteringByISBN: false,
+          }));
+
+          console.log("✅ Real API: 書籍登録完了", registeredBook);
+        }
+
+        // ✅ 成功時は認証エラー状態をクリア
+        get().clearAuthError();
+
+        return registeredBook;
+      } catch (err: any) {
+        console.error("❌ ISBN書籍登録エラー:", err);
+
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          // ✅ 認証エラーの場合
+          get().setAuthError(message);
+          set({ isRegisteringByISBN: false });
+          throw new Error("認証が必要です。再度ログインしてください。");
+        } else {
+          // ✅ 通常のエラーの場合
+          set({
+            error: message,
+            isRegisteringByISBN: false,
+          });
+          throw new Error(message);
+        }
+      }
+    },
+
     // ✅ 改良版: 書籍更新（認証エラー処理強化）
     updateBookById: async (id: number, updateData: BookUpdate) => {
       set({ isLoading: true, error: null });
@@ -383,4 +477,19 @@ export const useBookStore = create<BookStore>()(
 // デバッグ用（開発環境のみ）
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   (window as any).bookStore = useBookStore;
+}
+
+// 修正版
+if (import.meta.env.DEV) {
+  const useRealAPI = import.meta.env.VITE_USE_REAL_API === 'true';  // ←文字列比較
+  const useMockAPI = !useRealAPI;
+
+  console.log('📚 BookStore バーコード機能初期化');
+  console.log(`🔧 API Mode: ${useMockAPI ? 'Mock API' : 'Real API'}`);
+
+  if (useMockAPI) {
+    console.log('💡 Real APIを使用する場合: VITE_USE_REAL_API=true');
+  } else {
+    console.log('💡 Mock APIを使用する場合: VITE_USE_REAL_API=false');
+  }
 }
