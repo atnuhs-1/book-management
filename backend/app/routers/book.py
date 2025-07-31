@@ -9,9 +9,12 @@ from app.models.book import BookStatusEnum
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
-from app.services.google_books import (fetch_book_info_by_isbn,
-                                       search_books_by_title)
-from fastapi import APIRouter, Depends, HTTPException, status
+from app.services.google_books import (
+    fetch_book_info_by_isbn,
+    search_books_by_title,
+    search_books_by_title_rakuten  # ✅ 追加
+)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -28,7 +31,7 @@ def create_book(
 # 🔽 書籍登録（ISBN検索 + 自動登録）
 @router.post("/books/register-by-isbn", response_model=BookOut)
 def register_book_by_isbn(
-    payload: ISBNRequest,  # ✅ 修正：型を明示して"additionalProp1"防止
+    payload: ISBNRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -40,7 +43,6 @@ def register_book_by_isbn(
     if not book_info:
         raise HTTPException(status_code=404, detail=f"ISBN '{isbn}' の書籍情報が見つかりませんでした")
 
-    # タイトルから巻数抽出
     def extract_volume(title: str) -> str | None:
         patterns = [
             r"[第\s]*([0-9０-９]{1,3})\s*巻",
@@ -56,7 +58,6 @@ def register_book_by_isbn(
 
     volume = extract_volume(book_info["title"]) or ""
 
-    # 日付変換（YYYY or YYYY-MM-DD）
     pub_date_str = book_info.get("published_date")
     try:
         if pub_date_str and len(pub_date_str) == 4:
@@ -68,7 +69,6 @@ def register_book_by_isbn(
     except Exception:
         pub_date = datetime(2000, 1, 1).date()
 
-    # Book登録
     genres = book_info.get("categories") or []
 
     new_book = BookCreate(
@@ -81,14 +81,13 @@ def register_book_by_isbn(
         status=BookStatusEnum.OWNED,
         isbn=isbn,
         is_favorite=False,
-        genres = book_info.get("genres") or []
+        genres=book_info.get("genres") or []
     )
 
     return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
 
-# その他のエンドポイント（省略なし）
-
-@router.get("/me/books", response_model=list[BookOut])
+# 🔽 所持済みの本を取得
+@router.get("/me/books", response_model=List[BookOut])
 def get_my_books(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -99,7 +98,8 @@ def get_my_books(
         status=BookStatusEnum.OWNED
     )
 
-@router.get("/me/wishlist", response_model=list[BookOut])
+# 🔽 ウィッシュリストを取得
+@router.get("/me/wishlist", response_model=List[BookOut])
 def get_my_wishlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -108,6 +108,7 @@ def get_my_wishlist(
         db, user_id=current_user.id, status=BookStatusEnum.WISHLIST
     )
 
+# 🔽 お気に入りを取得
 @router.get("/me/books/favorites", response_model=List[BookOut])
 def get_favorite_books(
     db: Session = Depends(get_db),
@@ -115,6 +116,22 @@ def get_favorite_books(
 ):
     return crud_book.get_favorite_books_by_user_id(db, current_user.id)
 
+# 🔽 Google Books - タイトル検索
+@router.get("/search_book")
+def search_book(title: str):
+    return search_books_by_title(title)
+
+# 🔽 Rakuten Books - ISBNありのタイトル検索
+# 🔽 楽天APIによる検索（認証必須）
+@router.get("/books/search_rakuten")
+def search_books_rakuten(
+    title: str = Query(..., description="検索タイトル"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # ✅ 認証必須化
+):
+    return search_books_by_title_rakuten(title)
+
+# 🔽 書籍IDで取得
 @router.get("/books/{book_id}", response_model=BookOut)
 def read_book(
     book_id: int,
@@ -128,6 +145,7 @@ def read_book(
         raise HTTPException(status_code=403, detail="この書籍にはアクセスできません")
     return book
 
+# 🔽 Google Books - ISBN検索
 @router.get("/fetch_book/{isbn}")
 def fetch_book(isbn: str):
     book_info = fetch_book_info_by_isbn(isbn)
@@ -135,10 +153,7 @@ def fetch_book(isbn: str):
         return book_info
     raise HTTPException(status_code=404, detail="本が見つかりませんでした")
 
-@router.get("/search_book")
-def search_book(title: str):
-    return search_books_by_title(title)
-
+# 🔽 書籍情報更新
 @router.put("/books/{book_id}", response_model=BookOut)
 def update_my_book(
     book_id: int,
@@ -148,6 +163,7 @@ def update_my_book(
 ):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
+# 🔽 書籍情報更新（PATCH）
 @router.patch("/books/{book_id}", response_model=BookOut)
 def patch_book(
     book_id: int,
@@ -157,6 +173,7 @@ def patch_book(
 ):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
+# 🔽 ウィッシュリストに追加
 @router.put("/books/{book_id}/wishlist", response_model=BookOut)
 def add_to_wishlist(
     book_id: int,
