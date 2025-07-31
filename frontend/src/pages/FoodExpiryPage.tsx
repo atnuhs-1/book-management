@@ -1,41 +1,53 @@
 // src/pages/FoodExpiryPage.tsx
 
+import { useEffect, useState } from "react";
 import { GlassCard } from "../components/ui/GlassUI";
+import { useAuthStore } from "../stores/authStore";
 
-const sampleFoodItems = [
-  {
-    id: 1,
-    name: "牛乳",
-    expiryDate: "2024-02-05",
-    quantity: 2,
-    unit: "本",
-    status: "expiring",
-  },
-  {
-    id: 5,
-    name: "冷凍餃子",
-    expiryDate: "2024-01-30",
-    quantity: 3,
-    unit: "袋",
-    status: "expired",
-  },
-  {
-    id: 6,
-    name: "ポテトチップス",
-    expiryDate: "2024-02-10",
-    quantity: 4,
-    unit: "袋",
-    status: "expiring",
-  },
-];
+type FoodItem = {
+  id: number;
+  name: string;
+  category: string;
+  quantity: number;
+  expiration_date: string;
+};
 
 export const FoodExpiryPage = () => {
-  const expiredItems = sampleFoodItems.filter(
-    (item) => item.status === "expired"
-  );
-  const expiringItems = sampleFoodItems.filter(
-    (item) => item.status === "expiring"
-  );
+  const { token } = useAuthStore();
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+
+  useEffect(() => {
+    const fetchFoods = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/food-items/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) throw new Error("食品の取得に失敗しました");
+
+        const data = await res.json();
+        setFoodItems(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchFoods();
+  }, [token]);
+
+  const today = new Date();
+
+  const expiredItems = foodItems.filter((item) => {
+    const expiry = new Date(item.expiration_date);
+    return expiry < today;
+  });
+
+  const expiringItems = foodItems.filter((item) => {
+    const expiry = new Date(item.expiration_date);
+    const diff = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    return diff >= 0 && diff <= 3;
+  });
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -53,10 +65,10 @@ export const FoodExpiryPage = () => {
               className="bg-red-50/50 backdrop-blur-sm rounded-xl p-4 border border-red-200/30"
             >
               <h3 className="font-medium text-red-800">{item.name}</h3>
-              <p className="text-sm text-red-600">期限: {item.expiryDate}</p>
-              <p className="text-sm text-gray-600">
-                {item.quantity} {item.unit}
+              <p className="text-sm text-red-600">
+                期限: {item.expiration_date}
               </p>
+              <p className="text-sm text-gray-600">{item.quantity} 個</p>
             </div>
           ))}
         </div>
@@ -74,10 +86,10 @@ export const FoodExpiryPage = () => {
               className="bg-amber-50/50 backdrop-blur-sm rounded-xl p-4 border border-amber-200/30"
             >
               <h3 className="font-medium text-amber-800">{item.name}</h3>
-              <p className="text-sm text-amber-600">期限: {item.expiryDate}</p>
-              <p className="text-sm text-gray-600">
-                {item.quantity} {item.unit}
+              <p className="text-sm text-amber-600">
+                期限: {item.expiration_date}
               </p>
+              <p className="text-sm text-gray-600">{item.quantity} 個</p>
             </div>
           ))}
         </div>
