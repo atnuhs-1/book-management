@@ -46,6 +46,21 @@ def register_book_by_isbn(
     if not book_info:
         raise HTTPException(status_code=404, detail=f"ISBN '{isbn}' の書籍情報が見つかりませんでした")
 
+    # ✅ 重複チェック
+    existing_book = db.query(Book).filter(
+        Book.isbn == isbn,
+        Book.user_id == current_user.id
+    ).first()
+
+    if existing_book:
+        if existing_book.status == BookStatusEnum.OWNED:
+            raise HTTPException(status_code=400, detail="すでに所持しています。")
+        else:
+            existing_book.status = BookStatusEnum.OWNED
+            db.commit()
+            db.refresh(existing_book)
+            return existing_book
+
     volume = extract_volume(book_info["title"]) or ""
     pub_date_str = book_info.get("published_date")
     pub_date = parse_published_date(pub_date_str)
