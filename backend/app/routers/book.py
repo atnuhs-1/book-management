@@ -72,3 +72,12 @@ def update_my_book(
     current_user: User = Depends(get_current_user)
 ):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
+
+@router.patch("/books/{book_id}", response_model=BookOut)
+def patch_book(
+    book_id: int,
+    update_data: BookUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)

@@ -29,6 +29,7 @@ def fetch_book_info_by_isbn(isbn: str):
                     "publisher": volume_info.get("publisher"),
                     "published_date": volume_info.get("publishedDate"),
                     "cover_image_url": volume_info.get("imageLinks", {}).get("thumbnail"),
+                   # "genres": volume_info.get("categories", []),  # ← ジャンル情報を追加
                 }
 
     # フォールバック（ISBNが完全一致しない場合）
@@ -39,6 +40,7 @@ def fetch_book_info_by_isbn(isbn: str):
         "publisher": volume_info.get("publisher"),
         "published_date": volume_info.get("publishedDate"),
         "cover_image_url": volume_info.get("imageLinks", {}).get("thumbnail"),
+      #  "genres": volume_info.get("categories", []),  # ← ジャンル情報を追加
     }
 
 # タイトルから本の情報を取得（あいまい一致強化）
@@ -62,6 +64,7 @@ def search_books_by_title(title: str):
             "publisher": volume_info.get("publisher"),
             "published_date": volume_info.get("publishedDate"),
             "cover_image_url": volume_info.get("imageLinks", {}).get("thumbnail"),
+            "genres": volume_info.get("categories", []),  # ← ジャンル情報を追加
         }
         results.append(result)
 

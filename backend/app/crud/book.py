@@ -2,8 +2,21 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.book import Book, BookStatusEnum
 from app.schemas.book import BookCreate, BookUpdate
+from app.services.google_books import fetch_book_info_by_isbn
+
 
 def create_book(db: Session, book: BookCreate, user_id: int) -> Book:
+    genres = []
+
+    # Step 1: isbn からジャンル補完
+    if book.isbn:
+        book_info = fetch_book_info_by_isbn(book.isbn)
+        if book_info and book_info.get("genres"):
+            genres = book_info["genres"]
+
+    # Step 2: 手入力があればそちらを使用
+    if not genres and book.genres:
+        genres = book.genres
     db_book = Book(**book.dict(), user_id=user_id)
     db.add(db_book)
     db.commit()

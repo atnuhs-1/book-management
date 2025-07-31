@@ -1,6 +1,6 @@
 from datetime import date
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from enum import Enum as PyEnum  # enum.Enum を別名で使用
 
 # ✅ Enum 定義（str 継承でJSON互換）
@@ -18,6 +18,9 @@ class BookBase(BaseModel):
     cover_image_url: str
     published_date: date
     status: Optional[BookStatusEnum] = BookStatusEnum.OWNED
+    is_favorite: bool = False
+    isbn: Optional[str] = None
+    genres: List[str] = []
 
 # ✅ 更新用（すべてOptional）
 class BookUpdate(BaseModel):
@@ -28,6 +31,9 @@ class BookUpdate(BaseModel):
     cover_image_url: Optional[str] = None
     published_date: Optional[date] = None
     status: Optional[BookStatusEnum] = None  # ← 更新時にも使えるように入れておくと便利
+    is_favorite: bool | None = None  # ← PATCH用の柔軟定義
+    genres: Optional[List[str]] = None
+    isbn13: Optional[str] = None
 
 # ✅ 登録用（user_idはサーバー側で付与）
 class BookCreate(BookBase):
