@@ -1,11 +1,12 @@
 // src/pages/HomePage.tsx - v0デザイン適用版
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
 import { GlassCard, GlassButton } from "../components/ui/GlassUI";
 
 export const HomePage = () => {
+  const { token } = useAuthStore();
   const navigate = useNavigate();
   const { isAuthenticated, isInitialized } = useAuthStore();
   const { books, fetchBooks } = useBookStore();
@@ -18,15 +19,63 @@ export const HomePage = () => {
 
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]);
+  }, [loadBooks]);  
 
-  // 仮の食品データ（後でstoreに移行）
-  const foodStats = {
-    totalItems: 89,
-    expiringSoon: 12,
-    expired: 3,
-    freshItems: 74,
+  const getStatus = (dateStr: string): "expired" | "expiring" | "fresh" => {
+    const today = new Date();
+    const expiry = new Date(dateStr);
+    const diff = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return "expired";
+    if (diff <= 3) return "expiring";
+    return "fresh";
   };
+
+  const [foodStats, setFoodStats] = useState({
+    totalItems: 0,
+    expiringSoon: 0,
+    expired: 0,
+    freshItems: 0,
+  });
+
+  const loadFoodStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:8000/api/me/foods/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+  
+      if (!res.ok) throw new Error("食品データの取得に失敗");
+  
+      const data = await res.json();
+      const stats = {
+        totalItems: data.length,
+        expired: 0,
+        expiringSoon: 0,
+        freshItems: 0,
+      };
+  
+      data.forEach((item: any) => {
+        const itemStatus = getStatus(item.expiration_date);
+        if (itemStatus === "expired") stats.expired++;
+        else if (itemStatus === "expiring") stats.expiringSoon++;
+        else stats.freshItems++;
+      });
+  
+      setFoodStats(stats);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [token]);
+  
+  useEffect(() => {
+    loadBooks();
+    loadFoodStats();
+  }, [loadBooks, loadFoodStats]);
+
+
+
   const bookStats = {
     totalBooks: books.length,
     readBooks: 0,
