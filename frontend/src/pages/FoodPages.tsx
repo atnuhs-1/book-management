@@ -52,9 +52,11 @@ export const FoodPage = () => {
     return "fresh";
   };
 
+  const currentCategoryObj = foodCategories.find((cat) => cat.id === selectedCategory);
+
   const filteredItems = foodItems.filter(
     (item) =>
-      (selectedCategory === "all" || item.category === selectedCategory) &&
+      (selectedCategory === "all" || item.category === currentCategoryObj?.name) &&
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
