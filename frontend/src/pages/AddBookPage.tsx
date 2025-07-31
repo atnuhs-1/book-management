@@ -18,7 +18,6 @@ export const AddBookPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<
     "barcode" | "ocr" | "manual" | null
   >(null);
-  console.log("selectedMethod: ", selectedMethod);
 
   // ✅ bookStoreから新しい機能を取得
   const {
