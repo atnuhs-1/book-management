@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
@@ -14,11 +12,14 @@ import { SignupPage } from "./pages/SignupPage";
 import { TermsPage } from "./pages/TermsPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { WishlistPage } from "./pages/WishlistPage";
+import { AddBookPage } from "./pages/AddBookPage";
+import { FoodPage } from "./pages/FoodPages";
+import { FoodExpiryPage } from "./pages/FoodExpiryPage";
+import { RegisterFoodPage } from "./pages/RegisterFoodPage";
+import { RecipePage } from "./pages/RecipePage"; // ✅ レシピページ追加
 import { useAuthStore } from "./stores/authStore";
 
-// ✅ 新機能: グローバル認証エラー通知コンポーネント
 const AuthErrorNotification = () => {
-  // ✅ 修正: 個別に状態を取得してReactの再レンダリングを確実にトリガー
   const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
   const lastAuthError = useAuthStore((state) => state.lastAuthError);
   const setTokenExpired = useAuthStore((state) => state.setTokenExpired);
@@ -26,7 +27,6 @@ const AuthErrorNotification = () => {
 
   const [showNotification, setShowNotification] = useState(false);
 
-  // ✅ デバッグ用ログ追加
   useEffect(() => {
     if (isTokenExpired && lastAuthError) {
       setShowNotification(true);
@@ -41,7 +41,6 @@ const AuthErrorNotification = () => {
 
   const handleLoginRedirect = () => {
     handleClose();
-    // React Routerでリダイレクト（window.locationの代わり）
     window.location.href = "/login";
   };
 
@@ -51,9 +50,7 @@ const AuthErrorNotification = () => {
     <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-4 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <span className="text-2xl">⚠️</span>
-          </div>
+          <span className="text-2xl">⚠️</span>
           <div>
             <h4 className="font-semibold">セッション期限切れ</h4>
             <p className="text-sm text-red-100">{lastAuthError}</p>
@@ -106,9 +103,7 @@ function App() {
 
   return (
     <Router>
-      {/* ✅ 新機能: グローバル認証エラー通知 */}
       <AuthErrorNotification />
-
       <Routes>
         {/* 認証不要のページ */}
         <Route path="/login" element={<LoginPage />} />
@@ -122,11 +117,27 @@ function App() {
           element={
             <Layout>
               <Routes>
-                {/* 公開ページ */}
+                {/* ホーム */}
                 <Route path="/" element={<HomePage />} />
+
+                {/* 書籍管理 */}
                 <Route path="/books" element={<BooksPage />} />
+                <Route path="/book-list" element={<BooksPage />} />
                 <Route path="/books/:id" element={<BookDetailPage />} />
+                <Route path="/book-detail/:id" element={<BookDetailPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
+                <Route path="/add-book" element={<AddBookPage />} />
+
+                {/* 食品管理 */}
+                <Route path="/food" element={<FoodPage />} />
+                <Route path="/food-list" element={<FoodPage />} />
+                <Route path="/expiry" element={<FoodExpiryPage />} />
+                <Route path="/add-food" element={<RegisterFoodPage />} />
+
+                {/* ✅ レシピ提案 */}
+                <Route path="/recipes" element={<RecipePage />} />
+
+                {/* 設定 */}
                 <Route path="/settings" element={<SettingsPage />} />
 
                 {/* 認証が必要なページ */}
@@ -139,7 +150,7 @@ function App() {
                   }
                 />
 
-                {/* 404ページ */}
+                {/* 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Layout>
@@ -150,25 +161,22 @@ function App() {
   );
 }
 
-// 404ページコンポーネント
-const NotFoundPage = () => {
-  return (
-    <div className="text-center py-12">
-      <div className="text-6xl mb-4">📖</div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
-        ページが見つかりません
-      </h1>
-      <p className="text-gray-600 mb-6">
-        お探しのページは存在しないか、移動された可能性があります。
-      </p>
-      <a
-        href="/"
-        className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-      >
-        🏠 ホームに戻る
-      </a>
-    </div>
-  );
-};
+const NotFoundPage = () => (
+  <div className="text-center py-12">
+    <div className="text-6xl mb-4">📖</div>
+    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      ページが見つかりません
+    </h1>
+    <p className="text-gray-600 mb-6">
+      お探しのページは存在しないか、移動された可能性があります。
+    </p>
+    <a
+      href="/"
+      className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+    >
+      🏠 ホームに戻る
+    </a>
+  </div>
+);
 
 export default App;

@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
-
-from app.core.auth import create_access_token, verify_password, get_current_user
+from app.core.auth import (create_access_token, get_current_user,
+                           get_password_hash, verify_password)
 from app.core.database import get_db
-from app.schemas.user import TokenWithUser, UserCreate, UserOut
 from app.crud import user as crud_user
 from app.models.user import User
+from app.schemas.user import (ChangePasswordRequest, TokenWithUser,
+                              UpdateUserRequest, UserCreate, UserOut)
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -42,3 +43,54 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @router.get("/me", response_model=UserOut)
 def get_my_info(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.put("/users/me")
+def update_user_info(
+    update: UpdateUserRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+
+    if update.username:
+        user.username = update.username
+    if update.email:
+        user.email = update.email
+    if update.full_name:
+        user.full_name = update.full_name
+
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": "ユーザー情報を更新しました",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+        },
+    }
+
+
+# app/routers/user.py
+@router.put("/users/me/password")
+def change_password(
+    request: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 現在のパスワードが一致するか確認
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="現在のパスワードが間違っています"
+        )
+
+    # 新しいパスワードを保存
+    current_user.hashed_password = get_password_hash(request.new_password)
+    db.commit()
+
+    return {"message": "パスワードを変更しました"}
