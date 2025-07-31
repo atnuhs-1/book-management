@@ -13,7 +13,6 @@ import {
   GlassLoading,
 } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
-import { formatISBN } from "../utils/isbnValidator";
 
 export const AddBookPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<

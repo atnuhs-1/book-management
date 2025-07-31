@@ -9,9 +9,8 @@ import type {
   BookUpdate,
   GoogleBookInfo,
 } from "../types/book";
-import { mockRegisterBookByISBN } from "../services/mockBookApi";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface BookStore {
   books: Book[];
@@ -173,15 +172,6 @@ const formatErrorMessage = (
   }
 };
 
-// ✅ 新機能: 認証エラーをAuthStoreに委譲
-const handleAuthenticationError = (error: any): boolean => {
-  if (error.response?.status === 401) {
-    // authStoreがAxiosインターセプターで自動処理するため、ここでは何もしない
-    return true; // 認証エラーが検出されたことを示す
-  }
-  return false;
-};
-
 export const useBookStore = create<BookStore>()(
   devtools((set, get) => ({
     books: [],
@@ -325,8 +315,6 @@ export const useBookStore = create<BookStore>()(
 
     // ✅ 新規追加: ISBNによる書籍登録機能
     createBookByISBN: async (isbn: string) => {
-      console.log(`📚 createBookByISBN開始: ${isbn}`);
-
       set({
         isRegisteringByISBN: true,
         error: null,
@@ -334,45 +322,20 @@ export const useBookStore = create<BookStore>()(
       });
 
       try {
-        let registeredBook: Book;
+        // 実際のバックエンドAPIを使用
+        const response = await axios.post(
+          `${API_BASE_URL}/books/register-by-isbn`,
+          {
+            isbn,
+          }
+        );
 
-        // 🚧 開発環境判定とモック使用の切り替え
-        const isDevelopment = import.meta.env.DEV;
-        const useMockAPI = isDevelopment && !import.meta.env.VITE_USE_REAL_API;
+        const registeredBook = response.data.book || response.data;
 
-        if (useMockAPI) {
-          console.log("🧪 Mock API使用: ISBN登録");
-
-          // モックAPIを使用
-          registeredBook = await mockRegisterBookByISBN(isbn);
-
-          // ローカル状態に追加（モック用）
-          set((state) => ({
-            books: [...state.books, registeredBook],
-            isRegisteringByISBN: false,
-          }));
-
-          console.log("✅ Mock API: 書籍登録完了", registeredBook);
-        } else {
-          console.log("🌐 Real API使用: ISBN登録");
-
-          // 実際のバックエンドAPIを使用
-          const response = await axios.post(
-            `${API_BASE_URL}/books/register-by-isbn`,
-            {
-              isbn,
-            }
-          );
-
-          registeredBook = response.data.book || response.data;
-
-          set((state) => ({
-            books: [...state.books, registeredBook],
-            isRegisteringByISBN: false,
-          }));
-
-          console.log("✅ Real API: 書籍登録完了", registeredBook);
-        }
+        set((state) => ({
+          books: [...state.books, registeredBook],
+          isRegisteringByISBN: false,
+        }));
 
         // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
@@ -473,23 +436,3 @@ export const useBookStore = create<BookStore>()(
     },
   }))
 );
-
-// デバッグ用（開発環境のみ）
-if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-  (window as any).bookStore = useBookStore;
-}
-
-// 修正版
-if (import.meta.env.DEV) {
-  const useRealAPI = import.meta.env.VITE_USE_REAL_API === 'true';  // ←文字列比較
-  const useMockAPI = !useRealAPI;
-
-  console.log('📚 BookStore バーコード機能初期化');
-  console.log(`🔧 API Mode: ${useMockAPI ? 'Mock API' : 'Real API'}`);
-
-  if (useMockAPI) {
-    console.log('💡 Real APIを使用する場合: VITE_USE_REAL_API=true');
-  } else {
-    console.log('💡 Mock APIを使用する場合: VITE_USE_REAL_API=false');
-  }
-}
