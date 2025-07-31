@@ -1,9 +1,9 @@
 // src/pages/HomePage.tsx - v0デザイン適用版
-import { useEffect, useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useBookStore } from "../stores/bookStore";
+import { GlassButton, GlassCard } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
-import { GlassCard, GlassButton } from "../components/ui/GlassUI";
+import { useBookStore } from "../stores/bookStore";
 
 export const HomePage = () => {
   const navigate = useNavigate();
@@ -17,6 +17,8 @@ export const HomePage = () => {
   }, [isAuthenticated, isInitialized, fetchBooks]);
 
   useEffect(() => {
+    console.log("books:", books);
+    console.log("type of books:", typeof books);
     loadBooks();
   }, [loadBooks]);
 
@@ -169,30 +171,40 @@ export const HomePage = () => {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                {books.slice(0, 5).map((book) => (
-                  <div key={book.id} className="text-center group">
-                    <Link to={`/books/${book.id}`}>
-                      <div className="aspect-[3/4] bg-white/20 backdrop-blur-sm rounded-xl mb-3 overflow-hidden hover:shadow-xl transition-all duration-500 group-hover:scale-105 border border-white/20">
-                        {book.cover_image_url ? (
-                          <img
-                            src={book.cover_image_url}
-                            alt={book.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-3xl opacity-50">📖</span>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                    <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
-                      {book.title}
-                    </h3>
-                    <p className="text-xs text-gray-600">{book.author}</p>
+
+
+                {Array.isArray(books) && books.length > 0 ? (
+                  books.slice(0, 5).map((book) => (
+                    <div key={book.id} className="text-center group">
+                      <Link to={`/books/${book.id}`}>
+                        <div className="aspect-[3/4] bg-white/20 backdrop-blur-sm rounded-xl mb-3 overflow-hidden hover:shadow-xl transition-all duration-500 group-hover:scale-105 border border-white/20">
+                          {book.cover_image_url ? (
+                            <img
+                              src={book.cover_image_url}
+                              alt={book.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-3xl opacity-50">📖</span>
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+                      <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+                        {book.title}
+                      </h3>
+                      <p className="text-xs text-gray-600">{book.author}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-gray-500 mt-4">
+                    📚 書籍がまだ登録されていません。
                   </div>
-                ))}
+                )}
+
               </div>
+
             </GlassCard>
           )}
 

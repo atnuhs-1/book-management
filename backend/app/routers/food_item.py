@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from datetime import date, timedelta
 
-from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.user import User
-from app.models.food_item import FoodCategory
-from app.schemas.food_item import FoodItemCreate, FoodItemRead
+from app.core.database import get_db
 from app.crud import food_item as crud_food
+from app.models.food_item import FoodCategory
+from app.models.user import User
+from app.schemas.food_item import FoodItemCreate, FoodItemRead
+from app.services.hybrid_recipe import hybrid_recipe_suggestion
+from app.services.recipe_chatgpt import \
+    generate_recipe_focused_on_main_ingredient
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", tags=["food_items"])
 
@@ -55,6 +58,42 @@ def get_used_categories(
     current_user: User = Depends(get_current_user)
 ):
     return crud_food.get_used_categories(db, current_user.id)
+
+# app/routers/food_item.p
+
+@router.get("/foods/recipe_suggestions")
+def get_hybrid_recipes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    days: int = 3
+):
+    today = date.today()
+    deadline = today + timedelta(days=days)
+
+    foods = crud_food.get_expiring_food_items(db, current_user.id, today, deadline)
+    ingredients = [f.name for f in foods]
+
+    return hybrid_recipe_suggestion(ingredients)
+
+# ✅ GET /api/foods/recipe_by_main_food
+
+@router.get("/foods/recipe_by_main_food")
+def get_recipe_by_main_food(
+    food_name: str = Query(..., description="主材料とする食材名"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    today = date.today()
+    deadline = today + timedelta(days=3)
+    expiring_foods = crud_food.get_expiring_food_items(db, current_user.id, today, deadline)
+
+    if food_name not in [item.name for item in expiring_foods]:
+        raise HTTPException(status_code=404, detail="その食材は期限が近いものとして登録されていません")
+
+    return {
+        "source": "chatgpt",
+        "recipes": [generate_recipe_focused_on_main_ingredient(food_name)]
+    }
 
 # ✅ GET /api/foods/{food_id}
 @router.get("/foods/{food_id}", response_model=FoodItemRead)
