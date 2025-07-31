@@ -2,15 +2,14 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
-from dotenv import load_dotenv
-from jose import JWTError, jwt, ExpiredSignatureError
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-
 from app.core.database import get_db
 from app.models.user import User
+from dotenv import load_dotenv
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import ExpiredSignatureError, JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 # 環境変数読み込みと定数定義
 load_dotenv()
@@ -86,3 +85,10 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)

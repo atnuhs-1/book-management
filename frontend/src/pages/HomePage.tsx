@@ -202,7 +202,7 @@ export const HomePage = () => {
               ⚡ クイックアクション
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
-              <Link to="/register">
+              <Link to="/add-book">
                 <GlassButton variant="primary" size="lg" className="w-full">
                   📷 書籍を追加
                 </GlassButton>

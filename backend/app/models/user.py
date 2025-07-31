@@ -13,3 +13,4 @@ class User(Base):
 
     # ユーザが所有している本の一覧
     books = relationship("Book", back_populates="user", cascade="all, delete-orphan")
+    food_items = relationship("FoodItem", back_populates="user")
