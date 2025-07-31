@@ -66,10 +66,16 @@ def register_book_by_isbn(
     pub_date = parse_published_date(pub_date_str)
     genres = book_info.get("categories") or []
 
+    raw_authors = book_info.get("authors")
+    if isinstance(raw_authors, list):
+        author = ", ".join(raw_authors)
+    else:
+        author = raw_authors or ""
+
     new_book = BookCreate(
         title=book_info["title"],
         volume=volume,
-        author=", ".join(book_info.get("authors") or []),
+        author=author,
         publisher=book_info.get("publisher", "") or "",
         cover_image_url=book_info.get("cover_image_url", "") or "https://msp.c.yimg.jp/images/v2/FUTi93tXq405grZVGgDqGxFd07OLhx_m__6r2FpK2Um4tuuTp9RnKlnMuBJBv3Gdy4iZTldufLUyozbcCsSNUUE_iB1EInDgaZAMBGMmvZ7viMxLW7VaxnTNc7LZcvKO3xizbs_ovgVJkkmIP9y0ID-iWtqDwjQrm31HjeQnA0LfHFadohvEGY2xDtza2Vck1BCKZoADOcAld3yzXRTgdHLcTdqSVSsIZXoYyf16iviAQoZS0yY8OiztkD6wFCZDpp4QeLJJv_8FCsuGuzwPF6DwLtWor8vl9ORLFPI_f3jU_T57C0pg4bIyWBt-xiQ-PdtoNor6gMe7lVKlioFR9pMbED6p8XCno56zkwyuqYbRvef8_vF-QdW36RHZJjeg8o6zQcPYl1uIAxkvjQDVUg==/noimage_E38392E3829AE382AFE38388-760x460.png",
         published_date=pub_date,

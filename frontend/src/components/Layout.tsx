@@ -160,7 +160,7 @@ export const Layout = ({ children }: LayoutProps) => {
   return (
     <GlassBackground variant="multi">
       {/* ヘッダー */}
-      <header className="bg-white/20 backdrop-blur-xl border-b border-white/20 sticky top-0 z-50">
+      <header className="bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* ロゴ */}
@@ -327,7 +327,7 @@ export const Layout = ({ children }: LayoutProps) => {
       </header>
 
       {/* メインコンテンツ */}
-      <main className="relative px-4 sm:px-6 lg:px-8 py-8 pb-20 md:pb-8">
+      <main className="relative px-4 sm:px-6 lg:px-8 py-8 pb-20 md:pb-8 bg-white dark:bg-gray-900 transition-colors">
         {/* ブレッドクラム */}
         {breadcrumbs.length > 1 && (
           <div className="max-w-6xl mx-auto mb-6">
@@ -359,7 +359,7 @@ export const Layout = ({ children }: LayoutProps) => {
           location.pathname === "/add-food" ||  
           location.pathname === "/recipes" ) && (
           <div className="max-w-6xl mx-auto mb-6">
-            <div className="bg-white/20 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
+            <div className="bg-white/20 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
               <div className="flex gap-2 overflow-x-auto">
                 {[
                   { id: "/food-list", label: "一覧", emoji: "🍎" },
@@ -438,7 +438,7 @@ export const Layout = ({ children }: LayoutProps) => {
       )}
 
       {/* モバイルナビゲーション - 認証状態に応じて動的変更 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 backdrop-blur-xl border-t border-white/20 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-t border-white/20 dark:border-gray-700 z-50">
         <div className="grid grid-cols-4 gap-2 p-4">
           {mobileNavigationItems.map((item) => (
             <GlassMobileTab
