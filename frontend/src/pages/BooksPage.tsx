@@ -1,4 +1,4 @@
-// src/pages/BooksPage.tsx - v0レイアウト準拠版
+// src/pages/BooksPage.tsx - 全書籍個別表示版
 import { useEffect, useCallback, useState } from "react";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
@@ -16,8 +16,13 @@ export const BooksPage = () => {
   const { books, isLoading, error, fetchBooks } = useBookStore();
   const { isAuthenticated, isInitialized } = useAuthStore();
 
-  // ローカル検索状態（storeのsearchQueryは使わない）
+  // ローカル検索状態
   const [searchQuery, setSearchQuery] = useState("");
+  // ソート状態
+  const [sortBy, setSortBy] = useState<
+    "title" | "author" | "published_date" | "created_at"
+  >("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const loadBooks = useCallback(async () => {
     if (isAuthenticated && isInitialized) {
@@ -29,7 +34,7 @@ export const BooksPage = () => {
     loadBooks();
   }, [loadBooks]);
 
-  // フィルタリングロジック（シンプルな検索のみ）
+  // フィルタリングロジック
   const filteredBooks = books.filter((book) => {
     return (
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -38,32 +43,65 @@ export const BooksPage = () => {
     );
   });
 
-  // シリーズごとにグループ化（v0と同様の処理）
-  const seriesGroups = filteredBooks.reduce((groups, book) => {
-    // シリーズ名を推定（タイトルから巻数を除去）
-    const seriesName =
-      book.title.replace(/\s*\d+巻?$/, "").replace(/\s*第?\d+[巻話].*$/, "") ||
-      book.title;
-    if (!groups[seriesName]) {
-      groups[seriesName] = [];
+  // ソート処理
+  const sortedBooks = [...filteredBooks].sort((a, b) => {
+    let aValue, bValue;
+
+    switch (sortBy) {
+      case "title":
+        aValue = a.title.toLowerCase();
+        bValue = b.title.toLowerCase();
+        break;
+      case "author":
+        aValue = a.author.toLowerCase();
+        bValue = b.author.toLowerCase();
+        break;
+      case "published_date":
+        aValue = new Date(a.published_date).getTime();
+        bValue = new Date(b.published_date).getTime();
+        break;
+      case "created_at":
+      default:
+        aValue = new Date(a.created_at || 0).getTime();
+        bValue = new Date(b.created_at || 0).getTime();
+        break;
     }
-    groups[seriesName].push(book);
-    return groups;
-  }, {});
 
-  // 各シリーズの代表書籍と統計情報を計算
-  const seriesData = Object.entries(seriesGroups).map(([seriesName, books]) => {
-    const representativeBook = books[0]; // 最初の書籍を代表とする
-
-    return {
-      seriesName,
-      books,
-      representativeBook,
-      totalCount: books.length,
-      isComplete: books.length > 1, // 複数巻ある場合は完結扱い
-      hasMultiple: books.length > 1,
-    };
+    if (sortOrder === "asc") {
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    } else {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
   });
+
+  // ジャンル推定関数
+  const getGenre = (book: any) => {
+    const title = book.title.toLowerCase();
+    if (title.includes("巻") || title.includes("vol") || title.includes("第")) {
+      return "漫画";
+    } else if (
+      title.includes("code") ||
+      title.includes("技術") ||
+      title.includes("programming")
+    ) {
+      return "技術書";
+    } else if (title.includes("小説") || title.includes("novel")) {
+      return "小説";
+    } else {
+      return "書籍";
+    }
+  };
+
+  // ステータス推定関数
+  const getStatus = (book: any) => {
+    // 実際のプロジェクトではbook.statusなどの値を使用
+    // ここでは仮の実装
+    return Math.random() > 0.7
+      ? "読了"
+      : Math.random() > 0.5
+        ? "読書中"
+        : "積読";
+  };
 
   // 未認証の場合の表示
   if (!isAuthenticated) {
@@ -99,21 +137,47 @@ export const BooksPage = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* ヘッダー */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <h1 className="text-4xl font-light text-gray-800">📚 書籍一覧</h1>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <GlassInput
-              type="text"
-              placeholder="書籍名・著者・出版社で検索..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              icon="🔍"
-            />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <h1 className="text-4xl font-light text-gray-800">📚 書籍一覧</h1>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <GlassInput
+                type="text"
+                placeholder="書籍名・著者・出版社で検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon="🔍"
+              />
+            </div>
+            <Link to="/add-book">
+              <GlassButton variant="primary">➕ 追加</GlassButton>
+            </Link>
           </div>
-          <Link to="/add-book">
-            <GlassButton variant="primary">➕ 追加</GlassButton>
-          </Link>
+        </div>
+
+        {/* ソート・フィルター */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <span className="text-sm text-gray-600">並び替え:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+          >
+            <option value="created_at">登録日</option>
+            <option value="title">タイトル</option>
+            <option value="author">著者</option>
+            <option value="published_date">出版日</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 hover:bg-white/40 transition-colors"
+          >
+            {sortOrder === "asc" ? "↑" : "↓"}
+          </button>
+          <span className="text-sm text-gray-600 ml-2">
+            {sortedBooks.length}件表示
+          </span>
         </div>
       </div>
 
@@ -122,7 +186,7 @@ export const BooksPage = () => {
         <GlassLoading message="書籍を読み込み中..." />
       ) : error ? (
         <GlassError message={error} onRetry={() => fetchBooks()} />
-      ) : seriesData.length === 0 ? (
+      ) : sortedBooks.length === 0 ? (
         <GlassEmptyState
           icon={searchQuery ? "🔍" : "📚"}
           title={searchQuery ? "検索結果が見つかりません" : "書籍がありません"}
@@ -140,22 +204,18 @@ export const BooksPage = () => {
         />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {seriesData.map((series) => (
+          {sortedBooks.map((book) => (
             <div
-              key={series.seriesName}
+              key={book.id}
               className="bg-white/30 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group"
               onClick={() => {
-                // シリーズの最初の書籍の詳細ページに遷移
-                window.location.href = `/books/${series.representativeBook.id}`;
+                window.location.href = `/books/${book.id}`;
               }}
             >
               <div className="relative mb-3 overflow-hidden rounded-lg">
                 <img
-                  src={
-                    series.representativeBook.cover_image_url ||
-                    "/placeholder.svg"
-                  }
-                  alt={series.seriesName}
+                  src={book.cover_image_url || "/placeholder.svg"}
+                  alt={book.title}
                   className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-500"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -178,57 +238,50 @@ export const BooksPage = () => {
                 {/* ジャンルバッジ */}
                 <div className="absolute top-2 right-2">
                   <div className="px-2 py-1 rounded-full text-xs font-medium bg-blue-400/80 text-white">
-                    {series.representativeBook.title.includes("巻")
-                      ? "漫画"
-                      : series.representativeBook.title.includes("Code") ||
-                          series.representativeBook.title.includes("技術")
-                        ? "技術書"
-                        : "書籍"}
+                    {getGenre(book)}
                   </div>
                 </div>
 
-                {/* 巻数バッジ */}
-                {series.hasMultiple && (
-                  <div className="absolute top-2 left-2">
-                    <div className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
-                      {series.totalCount}冊
-                    </div>
+                {/* ステータスバッジ */}
+                <div className="absolute top-2 left-2">
+                  <div
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      getStatus(book) === "読了"
+                        ? "bg-green-400/80 text-white"
+                        : getStatus(book) === "読書中"
+                          ? "bg-yellow-400/80 text-white"
+                          : "bg-gray-400/80 text-white"
+                    }`}
+                  >
+                    {getStatus(book)}
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="space-y-2">
                 <h3 className="font-medium text-gray-800 text-sm line-clamp-2 leading-tight">
-                  {series.seriesName}
+                  {book.title}
                 </h3>
-                <p className="text-xs text-gray-600 truncate">
-                  {series.representativeBook.author}
-                </p>
+                <p className="text-xs text-gray-600 truncate">{book.author}</p>
 
                 {/* 出版情報 */}
                 <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span className="truncate">
-                    {series.representativeBook.publisher}
-                  </span>
-                  <span>
-                    {new Date(
-                      series.representativeBook.published_date
-                    ).getFullYear()}
-                    年
-                  </span>
+                  <span className="truncate">{book.publisher}</span>
+                  <span>{new Date(book.published_date).getFullYear()}年</span>
                 </div>
 
-                {/* ステータスバッジ */}
-                <div className="flex gap-2 flex-wrap">
-                  {series.isComplete && (
-                    <div className="px-2 py-1 rounded-full text-xs bg-green-400/20 text-green-700 border border-green-400/30">
-                      完読済み
-                    </div>
-                  )}
-                  {series.hasMultiple && (
-                    <div className="px-2 py-1 rounded-full text-xs bg-blue-400/20 text-blue-700 border border-blue-400/30">
-                      シリーズ
-                    </div>
+                {/* ISBN情報（あれば表示） */}
+                {book.isbn && (
+                  <div className="text-xs text-gray-500 truncate">
+                    ISBN: {book.isbn}
+                  </div>
+                )}
+
+                {/* 登録日 */}
+                <div className="text-xs text-gray-500">
+                  登録:{" "}
+                  {new Date(book.created_at || new Date()).toLocaleDateString(
+                    "ja-JP"
                   )}
                 </div>
               </div>
