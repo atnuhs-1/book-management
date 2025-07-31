@@ -1,10 +1,11 @@
+// frontend/src/App.tsx - ProtectedRoute修正版
+
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HomePage } from "./pages/HomePage";
 import { BooksPage } from "./pages/BooksPage";
-import { RegisterPage } from "./pages/RegisterPage";
 import { BookDetailPage } from "./pages/BookDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -16,7 +17,7 @@ import { AddBookPage } from "./pages/AddBookPage";
 import { FoodPage } from "./pages/FoodPages";
 import { FoodExpiryPage } from "./pages/FoodExpiryPage";
 import { RegisterFoodPage } from "./pages/RegisterFoodPage";
-import { RecipePage } from "./pages/RecipePage"; // ✅ レシピページ追加
+import { RecipePage } from "./pages/RecipePage";
 import { useAuthStore } from "./stores/authStore";
 
 const AuthErrorNotification = () => {
@@ -117,35 +118,109 @@ function App() {
           element={
             <Layout>
               <Routes>
-                {/* ホーム */}
+                {/* ✅ パブリックページ - 認証不要 */}
                 <Route path="/" element={<HomePage />} />
 
-                {/* 書籍管理 */}
-                <Route path="/books" element={<BooksPage />} />
-                <Route path="/book-list" element={<BooksPage />} />
-                <Route path="/books/:id" element={<BookDetailPage />} />
-                <Route path="/book-detail/:id" element={<BookDetailPage />} />
-                <Route path="/wishlist" element={<WishlistPage />} />
-                <Route path="/add-book" element={<AddBookPage />} />
-
-                {/* 食品管理 */}
-                <Route path="/food" element={<FoodPage />} />
-                <Route path="/food-list" element={<FoodPage />} />
-                <Route path="/expiry" element={<FoodExpiryPage />} />
-                <Route path="/add-food" element={<RegisterFoodPage />} />
-
-                {/* ✅ レシピ提案 */}
-                <Route path="/recipes" element={<RecipePage />} />
-
-                {/* 設定 */}
-                <Route path="/settings" element={<SettingsPage />} />
-
-                {/* 認証が必要なページ */}
+                {/* ✅ 認証が必要なページ - ProtectedRouteで保護 */}
                 <Route
-                  path="/register"
+                  path="/books"
                   element={
                     <ProtectedRoute>
-                      <RegisterPage />
+                      <BooksPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/book-list"
+                  element={
+                    <ProtectedRoute>
+                      <BooksPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/books/:id"
+                  element={
+                    <ProtectedRoute>
+                      <BookDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/book-detail/:id"
+                  element={
+                    <ProtectedRoute>
+                      <BookDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/wishlist"
+                  element={
+                    <ProtectedRoute>
+                      <WishlistPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* ✅ 重要: AddBookPageをProtectedRouteに追加 */}
+                <Route
+                  path="/add-book"
+                  element={
+                    <ProtectedRoute>
+                      <AddBookPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* ✅ 食品管理も認証が必要 */}
+                <Route
+                  path="/food"
+                  element={
+                    <ProtectedRoute>
+                      <FoodPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/food-list"
+                  element={
+                    <ProtectedRoute>
+                      <FoodPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/expiry"
+                  element={
+                    <ProtectedRoute>
+                      <FoodExpiryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/add-food"
+                  element={
+                    <ProtectedRoute>
+                      <RegisterFoodPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/recipes"
+                  element={
+                    <ProtectedRoute>
+                      <RecipePage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* ✅ 設定も認証が必要 */}
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <SettingsPage />
                     </ProtectedRoute>
                   }
                 />

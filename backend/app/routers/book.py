@@ -87,6 +87,7 @@ def register_book_by_isbn(
     return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
 
 # その他のエンドポイント（省略なし）
+
 @router.get("/me/books", response_model=list[BookOut])
 def get_my_books(
     db: Session = Depends(get_db),
