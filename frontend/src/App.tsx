@@ -1,23 +1,23 @@
 // frontend/src/App.tsx - ProtectedRoute修正版
 
 import { useEffect, useState } from "react";
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AddBookPage } from "./pages/AddBookPage";
-import { BookDetailPage } from "./pages/BookDetailPage";
-import { BooksPage } from "./pages/BooksPage";
-import { FoodExpiryPage } from "./pages/FoodExpiryPage";
-import { FoodPage } from "./pages/FoodPages";
 import { HomePage } from "./pages/HomePage";
-import { LoginPage } from "./pages/LoginPage";
-import { PrivacyPage } from "./pages/PrivacyPage";
-import { RecipePage } from "./pages/RecipePage";
-import { RegisterFoodPage } from "./pages/RegisterFoodPage";
+import { BooksPage } from "./pages/BooksPage";
+import { BookDetailPage } from "./pages/BookDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { TermsPage } from "./pages/TermsPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { WishlistPage } from "./pages/WishlistPage";
+import { AddBookPage } from "./pages/AddBookPage";
+import { FoodPage } from "./pages/FoodPages";
+import { FoodExpiryPage } from "./pages/FoodExpiryPage";
+import { RegisterFoodPage } from "./pages/RegisterFoodPage";
+import { RecipePage } from "./pages/RecipePage";
 import { useAuthStore } from "./stores/authStore";
 
 const AuthErrorNotification = () => {
