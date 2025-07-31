@@ -19,7 +19,7 @@ export const FoodExpiryPage = () => {
   useEffect(() => {
     const fetchFoods = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/food-items/", {
+        const res = await fetch("http://localhost:8000/api/me/foods/", {
           headers: {
             Authorization: `Bearer ${token}`,
           },

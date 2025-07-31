@@ -46,7 +46,7 @@ export const RegisterFoodPage = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/food-items/", {
+      const res = await fetch("http://localhost:8000/api/foods/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
