@@ -111,7 +111,7 @@ export const BooksPage = () => {
               icon="🔍"
             />
           </div>
-          <Link to="/register">
+          <Link to="/add-book">
             <GlassButton variant="primary">➕ 追加</GlassButton>
           </Link>
         </div>
@@ -134,7 +134,7 @@ export const BooksPage = () => {
           actionLabel={!searchQuery ? "最初の書籍を追加" : undefined}
           onAction={
             !searchQuery
-              ? () => (window.location.href = "/register")
+              ? () => (window.location.href = "/add-book")
               : undefined
           }
         />

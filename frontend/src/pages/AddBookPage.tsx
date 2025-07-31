@@ -1,4 +1,4 @@
-// src/pages/AddBookPage.tsx - Glassデザイン版
+// frontend/src/pages/AddBookPage.tsx - バーコード機能統合完全版
 
 import { useState } from "react";
 import { useBookStore } from "../stores/bookStore";
@@ -12,13 +12,22 @@ import {
   GlassError,
   GlassLoading,
 } from "../components/ui/GlassUI";
+import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
 
 export const AddBookPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<
     "barcode" | "ocr" | "manual" | null
   >(null);
 
-  const { createBook, isLoading, error } = useBookStore();
+  // ✅ bookStoreから新しい機能を取得
+  const {
+    createBook,
+    createBookByISBN, // ✅ 新機能: ISBN直接登録
+    isLoading,
+    isRegisteringByISBN, // ✅ 新機能: ISBN登録中フラグ
+    error,
+  } = useBookStore();
+
   const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
@@ -30,6 +39,35 @@ export const AddBookPage = () => {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [publishedDate, setPublishedDate] = useState("");
 
+  // ✅ 新機能: バーコードスキャン成功時の処理
+  const handleBarcodeSuccess = async (isbn: string) => {
+    console.log("🎯 バーコードスキャン成功:", isbn);
+
+    try {
+      const registeredBook = await createBookByISBN(isbn);
+
+      // 成功メッセージ表示
+      alert(`📚 「${registeredBook.title}」を登録しました！`);
+
+      // 書籍一覧ページに遷移
+      navigate("/book-list");
+    } catch (error: any) {
+      console.error("書籍登録エラー:", error);
+
+      // エラーメッセージ表示
+      alert(`❌ 登録に失敗しました: ${error.message}`);
+
+      // エラー時は手動入力に切り替えるオプションを提供
+      const shouldRetry = confirm("手動入力で書籍を追加しますか？");
+      if (shouldRetry) {
+        setSelectedMethod("manual");
+      } else {
+        setSelectedMethod(null);
+      }
+    }
+  };
+
+  // 手動入力の処理
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -128,7 +166,7 @@ export const AddBookPage = () => {
 
       {/* 方法選択カード */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* バーコードスキャン */}
+        {/* ✅ バーコードスキャン - 実装完了 */}
         <div
           className={`group cursor-pointer transition-all duration-500 ${
             selectedMethod === "barcode" ? "scale-105" : ""
@@ -223,31 +261,14 @@ export const AddBookPage = () => {
         </div>
       </div>
 
-      {/* バーコードスキャン機能（開発中） */}
+      {/* ✅ バーコードスキャン機能 - 実装完了 */}
       {selectedMethod === "barcode" && (
-        <GlassCard className="p-8">
-          <h2 className="text-2xl font-light text-gray-800 mb-6 flex items-center">
-            <span className="mr-3">📷</span>
-            バーコードスキャン
-          </h2>
-          <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-amber-400/30 to-amber-500/30 backdrop-blur-sm rounded-3xl mb-8 shadow-xl">
-              <span className="text-4xl">🚧</span>
-            </div>
-            <h3 className="text-xl font-light text-gray-800 mb-4">
-              開発中の機能
-            </h3>
-            <p className="text-gray-600 mb-8 leading-relaxed max-w-md mx-auto">
-              バーコード読み取り機能は現在開発中です。しばらくお待ちください。
-            </p>
-            <GlassButton
-              variant="primary"
-              onClick={() => setSelectedMethod("manual")}
-            >
-              手動入力で追加する
-            </GlassButton>
-          </div>
-        </GlassCard>
+        <BarcodeScanner
+          onISBNDetected={handleBarcodeSuccess}
+          onClose={() => setSelectedMethod(null)}
+          title="📷 バーコードスキャン"
+          subtitle="書籍のISBNバーコードをカメラに向けてください"
+        />
       )}
 
       {/* OCR機能（開発中） */}
@@ -450,6 +471,23 @@ export const AddBookPage = () => {
             </div>
           </div>
         </GlassCard>
+      )}
+
+      {/* ✅ バーコードスキャン中の全画面ローディング */}
+      {isRegisteringByISBN && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <GlassCard className="p-8 max-w-md mx-4">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
+              <h3 className="text-xl font-light text-gray-800 mb-4">
+                📚 書籍を登録しています...
+              </h3>
+              <p className="text-gray-600 text-sm">
+                Google Books APIから書籍情報を取得中です
+              </p>
+            </div>
+          </GlassCard>
+        </div>
       )}
     </div>
   );
