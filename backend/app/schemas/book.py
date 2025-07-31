@@ -14,20 +14,10 @@ class BookBase(BaseModel):
     title: str
     volume: str
     author: str
-    publisher: str
-    cover_image_url: str
+    publisher: Optional[str] = ""         # ✅ NoneでもOK、デフォルトは空文字
+    cover_image_url: Optional[str] = ""   # ✅ NoneでもOK、デフォルトは空文字
     published_date: date
     status: Optional[BookStatusEnum] = BookStatusEnum.OWNED
-
-# ✅ 更新用（すべてOptional）
-class BookUpdate(BaseModel):
-    title: Optional[str] = None
-    volume: Optional[str] = None
-    author: Optional[str] = None
-    publisher: Optional[str] = None
-    cover_image_url: Optional[str] = None
-    published_date: Optional[date] = None
-    status: Optional[BookStatusEnum] = None  # ← 更新時にも使えるように入れておくと便利
 
 # ✅ 登録用（user_idはサーバー側で付与）
 class BookCreate(BookBase):
@@ -40,3 +30,16 @@ class BookOut(BookBase):
 
     class Config:
         orm_mode = True
+
+class ISBNRequest(BaseModel):
+    isbn: str
+
+# ✅ 更新用（すべてOptional）
+class BookUpdate(BaseModel):
+    title: Optional[str] = None
+    volume: Optional[str] = None
+    author: Optional[str] = None
+    publisher: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    published_date: Optional[date] = None
+    status: Optional[BookStatusEnum] = None

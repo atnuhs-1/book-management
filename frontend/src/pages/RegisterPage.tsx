@@ -108,7 +108,7 @@ export const RegisterPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="text-center">
+      <div className="text-center flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">📚 書籍を追加</h1>
         <p className="text-gray-600">書籍を追加する方法を選択してください</p>
       </div>
