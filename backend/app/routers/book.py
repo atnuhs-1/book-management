@@ -2,24 +2,27 @@ import re
 from datetime import datetime
 from typing import List
 
-from app.core.auth import get_current_user
-from app.core.database import get_db
-from app.crud import book as crud_book
-from app.models.book import BookStatusEnum
-from app.models.notification import Notification
-from app.models.user import User
-from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
-from app.services.google_books import (
-    fetch_book_info_by_isbn,
-    search_books_by_title,
-    search_books_by_title_rakuten  # ✅ 追加
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user
+from app.core.database import get_db
+from app.crud import book as crud_book
+from app.models.book import Book, BookStatusEnum
+from app.models.notification import Notification
+from app.models.user import User
+from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
+from app.services.utils import extract_volume, parse_published_date
+from app.services.google_books import (
+    fetch_book_info_by_isbn,
+    search_books_by_title,
+    search_books_by_title_rakuten,
+    normalize_title,
+)
+
 router = APIRouter()
 
-# 🔽 書籍登録（手動入力）
+
 @router.post("/books", response_model=BookOut)
 def create_book(
     book: BookCreate,
@@ -28,7 +31,7 @@ def create_book(
 ):
     return crud_book.create_book(db=db, book=book, user_id=current_user.id)
 
-# 🔽 書籍登録（ISBN検索 + 自動登録）
+
 @router.post("/books/register-by-isbn", response_model=BookOut)
 def register_book_by_isbn(
     payload: ISBNRequest,
@@ -43,32 +46,9 @@ def register_book_by_isbn(
     if not book_info:
         raise HTTPException(status_code=404, detail=f"ISBN '{isbn}' の書籍情報が見つかりませんでした")
 
-    def extract_volume(title: str) -> str | None:
-        patterns = [
-            r"[第\s]*([0-9０-９]{1,3})\s*巻",
-            r"\(?第?([0-9０-９]{1,3})\)?\s*巻",
-            r"([0-9０-９]{1,3})\s*巻",
-            r"（?([0-9０-９]{1,3})）?",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, title)
-            if match:
-                return match.group(1)
-        return None
-
     volume = extract_volume(book_info["title"]) or ""
-
     pub_date_str = book_info.get("published_date")
-    try:
-        if pub_date_str and len(pub_date_str) == 4:
-            pub_date = datetime.strptime(pub_date_str, "%Y").date()
-        elif pub_date_str:
-            pub_date = datetime.strptime(pub_date_str, "%Y-%m-%d").date()
-        else:
-            pub_date = datetime(2000, 1, 1).date()
-    except Exception:
-        pub_date = datetime(2000, 1, 1).date()
-
+    pub_date = parse_published_date(pub_date_str)
     genres = book_info.get("categories") or []
 
     new_book = BookCreate(
@@ -86,7 +66,74 @@ def register_book_by_isbn(
 
     return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
 
-# 🔽 所持済みの本を取得
+
+@router.post("/books/wishlist-register", response_model=BookOut)
+def register_to_wishlist(
+    book_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    title = book_data.get("title")
+    authors = book_data.get("authors", [])
+    publisher = book_data.get("publisher", "")
+    cover_image_url = book_data.get("cover_image_url", "")
+    published_date_str = book_data.get("published_date")
+    genres = book_data.get("genres", [])
+    isbn = book_data.get("isbn")
+
+    if not isbn:
+        rakuten_results = search_books_by_title_rakuten(title)
+        matched = next(
+            (item for item in rakuten_results
+             if normalize_title(item["title"]) == normalize_title(title)),
+            None
+        )
+        if not matched:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="ISBNが見つかりませんでした（楽天Booksでも補完できませんでした）"
+            )
+        isbn = matched.get("isbn")
+
+    existing_book = db.query(Book).filter(
+        Book.isbn == isbn,
+        Book.user_id == current_user.id
+    ).first()
+
+    if existing_book:
+        if existing_book.status == BookStatusEnum.OWNED:
+            raise HTTPException(status_code=400, detail="すでに所持しています。")
+        elif existing_book.status == BookStatusEnum.WISHLIST:
+            raise HTTPException(status_code=400, detail="すでにウィッシュリストに追加されています。")
+        elif existing_book.status == BookStatusEnum.NOT_OWNED:
+            existing_book.status = BookStatusEnum.WISHLIST
+            db.commit()
+            db.refresh(existing_book)
+            return existing_book
+
+    volume = extract_volume(title) or ""
+    pub_date = parse_published_date(published_date_str)
+
+    new_book = Book(
+        title=title,
+        volume=volume,
+        author=", ".join(authors),
+        publisher=publisher,
+        cover_image_url=cover_image_url,
+        published_date=pub_date,
+        status=BookStatusEnum.WISHLIST,
+        is_favorite=False,
+        user_id=current_user.id,
+        genres=genres,
+        isbn=isbn
+    )
+
+    db.add(new_book)
+    db.commit()
+    db.refresh(new_book)
+    return new_book
+
+
 @router.get("/me/books", response_model=List[BookOut])
 def get_my_books(
     db: Session = Depends(get_db),
@@ -98,7 +145,7 @@ def get_my_books(
         status=BookStatusEnum.OWNED
     )
 
-# 🔽 ウィッシュリストを取得
+
 @router.get("/me/wishlist", response_model=List[BookOut])
 def get_my_wishlist(
     db: Session = Depends(get_db),
@@ -108,7 +155,7 @@ def get_my_wishlist(
         db, user_id=current_user.id, status=BookStatusEnum.WISHLIST
     )
 
-# 🔽 お気に入りを取得
+
 @router.get("/me/books/favorites", response_model=List[BookOut])
 def get_favorite_books(
     db: Session = Depends(get_db),
@@ -116,22 +163,21 @@ def get_favorite_books(
 ):
     return crud_book.get_favorite_books_by_user_id(db, current_user.id)
 
-# 🔽 Google Books - タイトル検索
+
 @router.get("/search_book")
 def search_book(title: str):
     return search_books_by_title(title)
 
-# 🔽 Rakuten Books - ISBNありのタイトル検索
-# 🔽 楽天APIによる検索（認証必須）
+
 @router.get("/books/search_rakuten")
 def search_books_rakuten(
     title: str = Query(..., description="検索タイトル"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)  # ✅ 認証必須化
+    current_user: User = Depends(get_current_user)
 ):
     return search_books_by_title_rakuten(title)
 
-# 🔽 書籍IDで取得
+
 @router.get("/books/{book_id}", response_model=BookOut)
 def read_book(
     book_id: int,
@@ -145,7 +191,7 @@ def read_book(
         raise HTTPException(status_code=403, detail="この書籍にはアクセスできません")
     return book
 
-# 🔽 Google Books - ISBN検索
+
 @router.get("/fetch_book/{isbn}")
 def fetch_book(isbn: str):
     book_info = fetch_book_info_by_isbn(isbn)
@@ -153,7 +199,7 @@ def fetch_book(isbn: str):
         return book_info
     raise HTTPException(status_code=404, detail="本が見つかりませんでした")
 
-# 🔽 書籍情報更新
+
 @router.put("/books/{book_id}", response_model=BookOut)
 def update_my_book(
     book_id: int,
@@ -163,7 +209,7 @@ def update_my_book(
 ):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
-# 🔽 書籍情報更新（PATCH）
+
 @router.patch("/books/{book_id}", response_model=BookOut)
 def patch_book(
     book_id: int,
@@ -173,14 +219,14 @@ def patch_book(
 ):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
-# 🔽 ウィッシュリストに追加
-@router.put("/books/{book_id}/wishlist", response_model=BookOut)
+
+@router.put("/books/{title}/wishlist", response_model=BookOut)
 def add_to_wishlist(
-    book_id: int,
+    title: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    updated_book = crud_book.update_book_status_to_wishlist(db, book_id, current_user.id)
+    updated_book = crud_book.update_book_status_to_wishlist(db, title, current_user.id)
     if not updated_book:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -74,11 +74,15 @@ def get_favorite_books_by_user_id(db: Session, user_id: int):
         .all()
     )
 
-def update_book_status_to_wishlist(db: Session, book_id: int, user_id: int):
-    book = db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+def update_book_status_to_wishlist(db: Session, title: str, user_id: int):
+    book = db.query(Book).filter(Book.title == title, Book.user_id == user_id).first()
     if not book:
-        return None
+        return {"success": False, "reason": "not_found"}
+
+    if book.status == "owned":
+        return {"success": False, "reason": "already_owned"}
+
     book.status = "wishlist"
     db.commit()
     db.refresh(book)
-    return book
+    return {"success": True, "book": book}

@@ -22,7 +22,7 @@ def extract_isbn(volume_info: dict) -> str | None:
 
 
 def search_books_by_title(title: str):
-    url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}&maxResults=20"
+    url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}&maxResults=10"
     if API_KEY:
         url += f"&key={API_KEY}"
 
@@ -48,7 +48,7 @@ def search_books_by_title(title: str):
         }
         results.append(result)
 
-    results = supplement_isbn_with_rakuten(results)
+    # results = supplement_isbn_with_rakuten(results)
 
     return results
 
