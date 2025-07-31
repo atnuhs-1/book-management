@@ -1,81 +1,58 @@
 // src/pages/FoodPages.tsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GlassCard, GlassInput } from "../components/ui/GlassUI";
+import { useAuthStore } from "../stores/authStore";
 
 const foodCategories = [
-  { id: "all", name: "すべて", icon: "🍽️", count: 89 },
-  { id: "fresh", name: "生鮮食品", icon: "🥬", count: 23 },
-  { id: "emergency", name: "非常食", icon: "🥫", count: 15 },
-  { id: "beverages", name: "飲料", icon: "🥤", count: 18 },
-  { id: "seasonings", name: "調味料", icon: "🧂", count: 12 },
-  { id: "frozen", name: "冷凍食品", icon: "🧊", count: 14 },
-  { id: "snacks", name: "お菓子", icon: "🍪", count: 7 },
-];
-
-const sampleFoodItems = [
-  {
-    id: 1,
-    name: "牛乳",
-    category: "fresh",
-    expiryDate: "2024-02-05",
-    quantity: 2,
-    unit: "本",
-    status: "expiring",
-  },
-  {
-    id: 2,
-    name: "カップラーメン",
-    category: "emergency",
-    expiryDate: "2024-12-31",
-    quantity: 5,
-    unit: "個",
-    status: "fresh",
-  },
-  {
-    id: 3,
-    name: "コーラ",
-    category: "beverages",
-    expiryDate: "2024-06-15",
-    quantity: 6,
-    unit: "本",
-    status: "fresh",
-  },
-  {
-    id: 4,
-    name: "醤油",
-    category: "seasonings",
-    expiryDate: "2024-03-01",
-    quantity: 1,
-    unit: "本",
-    status: "fresh",
-  },
-  {
-    id: 5,
-    name: "冷凍餃子",
-    category: "frozen",
-    expiryDate: "2024-01-30",
-    quantity: 3,
-    unit: "袋",
-    status: "expired",
-  },
-  {
-    id: 6,
-    name: "ポテトチップス",
-    category: "snacks",
-    expiryDate: "2024-02-10",
-    quantity: 4,
-    unit: "袋",
-    status: "expiring",
-  },
+  { id: "all", name: "すべて", icon: "🍽️" },
+  { id: "FRESH", name: "生鮮食品", icon: "🥬" },
+  { id: "EMERGENCY", name: "非常食", icon: "🥫" },
+  { id: "BEVERAGES", name: "飲料", icon: "🥤" },
+  { id: "SEASONINGS", name: "調味料", icon: "🧂" },
+  { id: "FROZEN", name: "冷凍食品", icon: "🧊" },
+  { id: "SNACKS", name: "お菓子", icon: "🍪" },
 ];
 
 export const FoodPage = () => {
+  const { token } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
 
-  const filteredItems = sampleFoodItems.filter(
+  useEffect(() => {
+    const fetchFoods = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/me/foods/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("食品の取得に失敗しました");
+
+        const data = await res.json();
+        setFoodItems(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchFoods();
+  }, [token]);
+
+  // ステータス判定
+  const getStatus = (dateStr: string) => {
+    const today = new Date();
+    const expiry = new Date(dateStr);
+    const diff = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return "expired";
+    if (diff <= 3) return "expiring";
+    return "fresh";
+  };
+
+  const filteredItems = foodItems.filter(
     (item) =>
       (selectedCategory === "all" || item.category === selectedCategory) &&
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -111,7 +88,7 @@ export const FoodPage = () => {
         </button>
       </div>
 
-      {/* ✅ PC用：従来のカテゴリボタン */}
+      {/* ✅ PC用：カテゴリボタン */}
       <div className="hidden sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-4">
         {foodCategories.map((category) => (
           <button
@@ -127,7 +104,6 @@ export const FoodPage = () => {
             <div className="text-xs font-medium text-gray-700">
               {category.name}
             </div>
-            <div className="text-xs text-gray-500 mt-1">{category.count}</div>
           </button>
         ))}
       </div>
@@ -168,22 +144,20 @@ export const FoodPage = () => {
         </div>
       )}
 
-      {/* 食品一覧 */}
+      {/* ✅ 一覧表示 */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredItems.map((item) => (
+        {filteredItems.map((item: any) => (
           <GlassCard key={item.id} className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="font-medium text-gray-800 mb-1">{item.name}</h3>
-                <p className="text-sm text-gray-600">
-                  {foodCategories.find((c) => c.id === item.category)?.name}
-                </p>
+                <p className="text-sm text-gray-600">{item.category}</p>
               </div>
               <div
                 className={`w-4 h-4 rounded-full shadow-lg ${
-                  item.status === "expired"
+                  getStatus(item.expiration_date) === "expired"
                     ? "bg-red-400"
-                    : item.status === "expiring"
+                    : getStatus(item.expiration_date) === "expiring"
                     ? "bg-amber-400"
                     : "bg-green-400"
                 }`}
@@ -193,13 +167,13 @@ export const FoodPage = () => {
               <div className="flex justify-between">
                 <span>数量</span>
                 <span className="text-gray-800 font-medium">
-                  {item.quantity} {item.unit}
+                  {item.quantity}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>期限</span>
                 <span className="text-gray-800 font-medium">
-                  {item.expiryDate}
+                  {item.expiration_date}
                 </span>
               </div>
             </div>
@@ -211,9 +185,9 @@ export const FoodPage = () => {
         <div className="text-center py-16">
           <div className="text-4xl mb-4 opacity-50">🍎</div>
           <h3 className="text-xl font-light text-gray-800 mb-2">
-            検索結果が見つかりません
+            食品が見つかりません
           </h3>
-          <p className="text-gray-600">別のキーワードで検索してみてください</p>
+          <p className="text-gray-600">別の条件で検索してみてください</p>
         </div>
       )}
     </div>
