@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Enum as SqlEnum
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Enum as SqlEnum, Boolean,JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from enum import Enum as PyEnum
@@ -30,5 +30,9 @@ class Book(Base):
         nullable=False
     )
 
+    is_favorite = Column(Boolean, nullable=False, default=False)
+
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="books")
+    genres = Column(JSON, nullable=False, default=[])
+    isbn = Column(String(13), nullable=True, unique=False) # いるかわからん。いらんかったら消して

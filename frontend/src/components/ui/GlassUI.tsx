@@ -34,7 +34,13 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       {children}
     </div>
   );
-};
+};  
+
+interface GlassInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+  icon?: string;
+}
 
 // ✅ グラデーション背景コンポーネント
 interface GlassBackgroundProps {
@@ -73,6 +79,7 @@ interface GlassButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
+  type?: "button" | "submit" | "reset";
   variant?: "primary" | "secondary" | "outline";
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
@@ -130,6 +137,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
 // ✅ グラス入力フィールドコンポーネント
 interface GlassInputProps {
+  label?: string; 
   type?: string;
   placeholder?: string;
   value: string;
@@ -141,6 +149,7 @@ interface GlassInputProps {
 }
 
 export const GlassInput: React.FC<GlassInputProps> = ({
+  label,
   type = "text",
   placeholder,
   value,
@@ -151,24 +160,38 @@ export const GlassInput: React.FC<GlassInputProps> = ({
   icon,
 }) => {
   return (
-    <div className={`relative ${className}`}>
-      {icon && (
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-          {icon}
-        </div>
+    <div className={`space-y-1 ${className}`}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 dark:text-white">
+          {label}
+        </label>
       )}
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        className={`w-full px-4 py-2 ${icon ? "pl-10" : ""} bg-white/30 backdrop-blur-xl border border-white/20 rounded-xl text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300 ${error ? "border-red-300 focus:border-red-500" : ""}`}
-      />
+
+      <div className="relative">
+        {icon && (
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+            {icon}
+          </div>
+        )}
+        <input
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className={`w-full px-4 py-2 ${
+            icon ? "pl-10" : ""
+          } bg-white/30 backdrop-blur-xl border border-white/20 rounded-xl text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300 ${
+            error ? "border-red-300 focus:border-red-500" : ""
+          }`}
+        />
+      </div>
+
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 };
+
 
 // ✅ グラス統計カードコンポーネント
 interface GlassStatCardProps {

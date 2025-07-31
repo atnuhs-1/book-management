@@ -5,8 +5,21 @@ from app.schemas.book import BookCreate, BookUpdate
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.services.google_books import fetch_book_info_by_isbn
+
 
 def create_book(db: Session, book: BookCreate, user_id: int) -> Book:
+    genres = []
+
+    # Step 1: isbn からジャンル補完
+    if book.isbn:
+        book_info = fetch_book_info_by_isbn(book.isbn)
+        if book_info and book_info.get("genres"):
+            genres = book_info["genres"]
+
+    # Step 2: 手入力があればそちらを使用
+    if not genres and book.genres:
+        genres = book.genres
     db_book = Book(**book.dict(), user_id=user_id)
     db.add(db_book)
     db.commit()
@@ -52,3 +65,20 @@ def get_books_releasing_tomorrow(db: Session):
     books = db.query(Book).filter(Book.published_date == tomorrow).all()
     print(f"📚 FOUND BOOKS: {[book.title for book in books]}")
     return books
+
+# 追加：お気に入りの書籍だけ取得
+def get_favorite_books_by_user_id(db: Session, user_id: int):
+    return (
+        db.query(Book)
+        .filter(Book.user_id == user_id, Book.is_favorite == True)
+        .all()
+    )
+
+def update_book_status_to_wishlist(db: Session, book_id: int, user_id: int):
+    book = db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+    if not book:
+        return None
+    book.status = "wishlist"
+    db.commit()
+    db.refresh(book)
+    return book

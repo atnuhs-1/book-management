@@ -2,25 +2,26 @@
 
 import { useState } from "react";
 import { GlassCard, GlassInput, GlassButton } from "../components/ui/GlassUI";
+import { useAuthStore } from "../stores/authStore";
 
-// "すべて" を除くカテゴリ
 const foodCategories = [
-  { id: "fresh", name: "生鮮食品", icon: "🥬" },
-  { id: "emergency", name: "非常食", icon: "🥫" },
-  { id: "beverages", name: "飲料", icon: "🥤" },
-  { id: "seasonings", name: "調味料", icon: "🧂" },
-  { id: "frozen", name: "冷凍食品", icon: "🧊" },
-  { id: "snacks", name: "お菓子", icon: "🍪" },
+  { id: "FRESH", name: "生鮮食品", icon: "🥬" },
+  { id: "EMERGENCY", name: "非常食", icon: "🥫" },
+  { id: "BEVERAGES", name: "飲料", icon: "🥤" },
+  { id: "SEASONINGS", name: "調味料", icon: "🧂" },
+  { id: "FROZEN", name: "冷凍食品", icon: "🧊" },
+  { id: "SNACKS", name: "お菓子", icon: "🍪" },
 ];
 
 type FoodItem = {
   name: string;
   category: string;
-  expiryDate: string;
-  quantity: string; // input value is string
+  expiration_date: string;
+  quantity: string;
 };
 
 export const RegisterFoodPage = () => {
+  const { token } = useAuthStore();
   const [mode, setMode] = useState<"manual" | "barcode" | null>(null);
   const [food, setFood] = useState<Partial<FoodItem>>({ quantity: "1" });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -37,15 +38,39 @@ export const RegisterFoodPage = () => {
     setFood((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!food.name || !food.category || !food.expiryDate || !food.quantity || Number(food.quantity) < 1) {
+    if (!food.name || !food.category || !food.expiration_date || !food.quantity || Number(food.quantity) < 1) {
       alert("すべての項目を正しく入力してください");
       return;
     }
-    alert("食品を登録しました！");
-    setFood({ quantity: "1" });
-    setMode(null);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/foods/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: food.name.trim(),
+          category: selectedCategory?.name || "", // ✅ 日本語のEnum名を送信
+          quantity: Number(food.quantity),
+          expiration_date: food.expiration_date,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("登録に失敗しました");
+      }
+
+      alert("食品を登録しました！");
+      setFood({ quantity: "1" });
+      setMode(null);
+    } catch (err) {
+      alert("登録中にエラーが発生しました");
+      console.error(err);
+    }
   };
 
   const selectedCategory = foodCategories.find((c) => c.id === food.category);
@@ -62,9 +87,7 @@ export const RegisterFoodPage = () => {
           >
             <div className="text-4xl mb-2">📷</div>
             <h2 className="text-lg font-medium text-gray-700">バーコードで登録</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              商品情報を読み取り、期限だけ入力
-            </p>
+            <p className="text-sm text-gray-500 mt-1">商品情報を読み取り、期限だけ入力</p>
           </GlassCard>
           <GlassCard
             className="cursor-pointer p-6 text-center hover:bg-white/30 transition"
@@ -72,9 +95,7 @@ export const RegisterFoodPage = () => {
           >
             <div className="text-4xl mb-2">✍️</div>
             <h2 className="text-lg font-medium text-gray-700">手動入力で登録</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              すべての情報を自分で入力
-            </p>
+            <p className="text-sm text-gray-500 mt-1">すべての情報を自分で入力</p>
           </GlassCard>
         </div>
       )}
@@ -82,15 +103,7 @@ export const RegisterFoodPage = () => {
       {(mode === "barcode" || mode === "manual") && (
         <GlassCard className="p-6 space-y-4">
           <h2 className="text-2xl font-light text-gray-800 flex items-center">
-            {mode === "barcode" ? (
-              <>
-                <span className="mr-3">📷</span>バーコード登録
-              </>
-            ) : (
-              <>
-                <span className="mr-3">✍️</span>手動入力
-              </>
-            )}
+            {mode === "barcode" ? <>📷 バーコード登録</> : <>✍️ 手動入力</>}
           </h2>
 
           {mode === "barcode" && (
@@ -112,9 +125,7 @@ export const RegisterFoodPage = () => {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  カテゴリ
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
                 <button
                   type="button"
                   onClick={() => setShowCategoryModal(true)}
@@ -144,8 +155,8 @@ export const RegisterFoodPage = () => {
                 label="賞味/消費期限"
                 type="date"
                 placeholder="日付を選択"
-                value={food.expiryDate || ""}
-                onChange={(e) => handleChange("expiryDate", e.target.value)}
+                value={food.expiration_date || ""}
+                onChange={(e) => handleChange("expiration_date", e.target.value)}
               />
 
               <div className="flex gap-4 pt-2">
@@ -171,9 +182,7 @@ export const RegisterFoodPage = () => {
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-lg font-medium text-gray-800 text-center mb-2">
-              カテゴリを選択
-            </h2>
+            <h2 className="text-lg font-medium text-gray-800 text-center mb-2">カテゴリを選択</h2>
             <div className="grid grid-cols-2 gap-3">
               {foodCategories.map((category) => (
                 <button

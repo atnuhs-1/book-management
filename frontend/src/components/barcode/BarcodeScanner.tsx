@@ -32,7 +32,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   } = useBarcodeScanner({
     preferBackCamera: true,
     continuousScan: false,
-    scanDelay: 500,
+    scanDelay: 1000,
   });
 
   const cameraPermission = useCameraPermission();

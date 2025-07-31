@@ -30,7 +30,7 @@ export const useBarcodeScanner = (
   const {
     preferBackCamera = true,
     continuousScan = false,
-    scanDelay = 100,
+    scanDelay = 1000,
   } = config;
 
   // ZXing リーダーのインスタンス
@@ -54,6 +54,7 @@ export const useBarcodeScanner = (
    */
   useEffect(() => {
     const initializeReader = async () => {
+      console.log("delay", scanDelay);
       try {
         console.log("📷 ZXing リーダー初期化開始");
         readerRef.current = new BrowserMultiFormatReader();
