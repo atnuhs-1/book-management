@@ -1,7 +1,10 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from datetime import date, timedelta
+
 from app.models.book import Book, BookStatusEnum
 from app.schemas.book import BookCreate, BookUpdate
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 
 def create_book(db: Session, book: BookCreate, user_id: int) -> Book:
     db_book = Book(**book.dict(), user_id=user_id)
@@ -34,3 +37,18 @@ def get_books_by_user_id_and_status(db: Session, user_id: int, status: BookStatu
         Book.user_id == user_id,
         Book.status == status
     ).all()
+
+from datetime import datetime
+
+from pytz import timezone
+
+
+def get_books_releasing_tomorrow(db: Session):
+    jst = timezone("Asia/Tokyo")
+    today = datetime.now(jst).date()
+    tomorrow = today + timedelta(days=1)
+    print(f"🕒 TODAY: {today} / TOMORROW: {tomorrow}")
+
+    books = db.query(Book).filter(Book.published_date == tomorrow).all()
+    print(f"📚 FOUND BOOKS: {[book.title for book in books]}")
+    return books

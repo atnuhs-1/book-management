@@ -1,10 +1,14 @@
+from typing import List
+
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import book as crud_book
-from app.models.user import User
 from app.models.book import BookStatusEnum
+from app.models.notification import Notification
+from app.models.user import User
 from app.schemas.book import BookCreate, BookOut, BookUpdate
-from app.services.google_books import fetch_book_info_by_isbn, search_books_by_title
+from app.services.google_books import (fetch_book_info_by_isbn,
+                                       search_books_by_title)
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,6 +23,7 @@ def create_book(
     return crud_book.create_book(db=db, book=book, user_id=current_user.id)
 
 from app.models.book import BookStatusEnum  # 必要
+
 
 @router.get("/me/books", response_model=list[BookOut])
 def get_my_books(
