@@ -1,84 +1,220 @@
-// src/pages/RecipePage.tsx
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { GlassCard } from "../components/ui/GlassUI";
+import { useAuthStore } from "../stores/authStore";
 
-const sampleFoodItems = [
-  { id: 1, name: "牛乳", status: "expiring" },
-  { id: 6, name: "ポテトチップス", status: "expiring" },
-];
+interface FoodItem {
+  id: number;
+  name: string;
+  category: string;
+  quantity: number;
+  expiration_date: string;
+}
 
-const sampleRecipes = [
-  {
-    id: 1,
-    title: "パンケーキ",
-    ingredients: ["牛乳", "小麦粉", "卵"],
-    steps: ["材料を混ぜる", "焼く"],
-  },
-  {
-    id: 2,
-    title: "ミルクスープ",
-    ingredients: ["牛乳", "玉ねぎ", "ベーコン"],
-    steps: ["炒める", "牛乳を加える", "煮込む"],
-  },
-];
+interface RecipeFromGPT {
+  source: string;
+  recipes: string[];
+}
 
 export const RecipePage = () => {
-  const expiringFoods = sampleFoodItems.filter(
-    (item) => item.status === "expiring"
+  const { token } = useAuthStore();
+  const [expiringFoods, setExpiringFoods] = useState<FoodItem[]>([]);
+  const [selectedFood, setSelectedFood] = useState<string | null>(null);
+  const [mainFoodRecipes, setMainFoodRecipes] = useState<string[]>([]);
+  const [suggestedRecipes, setSuggestedRecipes] = useState<string[]>([]);
+  const [mainReloadKey, setMainReloadKey] = useState(0);
+  const [suggestedReloadKey, setSuggestedReloadKey] = useState(0);
+
+  const [loadingExpiring, setLoadingExpiring] = useState(false);
+  const [loadingMain, setLoadingMain] = useState(false);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
+
+  useEffect(() => {
+    const fetchExpiringFoods = async () => {
+      if (!token) return;
+      setLoadingExpiring(true);
+      try {
+        const res = await fetch("http://localhost:8000/api/foods/expiring_soon", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("期限間近の食品取得に失敗");
+        const data = await res.json();
+        if (Array.isArray(data)) setExpiringFoods(data);
+      } catch (err) {
+        console.error("期限間近の食品取得エラー:", err);
+      } finally {
+        setLoadingExpiring(false);
+      }
+    };
+    fetchExpiringFoods();
+  }, [token]);
+
+  useEffect(() => {
+    const fetchMainFoodRecipe = async () => {
+      if (!selectedFood || !token) return;
+      setLoadingMain(true);
+      try {
+        const res = await axios.get<RecipeFromGPT>("http://localhost:8000/api/foods/recipe_by_main_food", {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { food_name: selectedFood },
+        });
+        const rawRecipes = res.data.recipes;
+        const extracted = rawRecipes.flatMap((entry) =>
+          entry
+            .split(/^##\s*レシピ名[:：]/gm)
+            .filter(Boolean)
+            .map((r) => "## レシピ名: " + r.trim())
+        );
+        setMainFoodRecipes(extracted);
+      } catch (err) {
+        console.warn("主材料レシピ取得失敗:", err);
+        setMainFoodRecipes([]);
+      } finally {
+        setLoadingMain(false);
+      }
+    };
+    fetchMainFoodRecipe();
+  }, [selectedFood, token, mainReloadKey]);
+
+  useEffect(() => {
+    const fetchSuggestedRecipes = async () => {
+      if (!token) return;
+      setLoadingSuggested(true);
+      try {
+        const res = await axios.get<RecipeFromGPT>("http://localhost:8000/api/foods/recipe_suggestions", {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { days: 3 },
+        });
+        const rawRecipes = res.data.recipes;
+        const extracted = rawRecipes.flatMap((entry) =>
+          entry
+            .split(/^##\s*レシピ名[:：]/gm)
+            .filter(Boolean)
+            .map((r) => "## レシピ名: " + r.trim())
+        );
+        setSuggestedRecipes(extracted);
+      } catch (err) {
+        console.warn("複数食材レシピ取得失敗:", err);
+        setSuggestedRecipes([]);
+      } finally {
+        setLoadingSuggested(false);
+      }
+    };
+    fetchSuggestedRecipes();
+  }, [token, suggestedReloadKey]);
+
+  const normalizeRecipe = (text: string) => {
+    return text
+      .replace(/#+\s*(レシピ名[:：]?\s*)+/gi, "## レシピ名: ")
+      .replace(/材料[:：]/g, "### 材料:\n- ")
+      .replace(/、/g, "\n- ")
+      .replace(/　/g, " ")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "-" && line !== "")
+      .join("\n")
+      .trim();
+  };
+
+  const Spinner = () => (
+    <div className="flex justify-center p-4">
+      <div className="w-6 h-6 border-4 border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+    </div>
   );
 
-  const [selectedFood, setSelectedFood] = useState<string | null>(null);
-
-  const matchingRecipes = selectedFood
-    ? sampleRecipes.filter((r) => r.ingredients.includes(selectedFood))
-    : [];
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <h1 className="text-4xl font-light text-gray-800">レシピ提案</h1>
+    <div className="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <h1 className="text-5xl font-extralight text-center text-gray-800 drop-shadow-md">レシピ提案</h1>
 
-      <div>
-        <h2 className="text-lg font-medium text-gray-700 mb-2">期限が迫っている食品</h2>
-        <div className="flex flex-wrap gap-3">
-          {expiringFoods.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSelectedFood(item.name)}
-              className={`px-4 py-2 rounded-full text-sm border ${
-                selectedFood === item.name
-                  ? "bg-blue-500 text-white"
-                  : "bg-white text-gray-800"
-              }`}
-            >
-              {item.name}
-            </button>
-          ))}
-        </div>
-      </div>
+      <GlassCard className="p-6">
+        <h2 className="text-xl font-medium text-gray-700 mb-4">期限が迫っている食品</h2>
+        {loadingExpiring ? (
+          <Spinner />
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {expiringFoods.length === 0 ? (
+              <p className="text-gray-500">期限間近の食品はありません。</p>
+            ) : (
+              expiringFoods.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedFood(item.name);
+                    setMainReloadKey((prev) => prev + 1);
+                  }}
+                  className={`px-4 py-2 rounded-full text-sm border transition ${
+                    selectedFood === item.name
+                      ? "bg-blue-500 text-white shadow-md"
+                      : "bg-white text-gray-800 hover:bg-gray-100"
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </GlassCard>
 
       {selectedFood && (
-        <div>
-          <h2 className="text-lg font-medium text-gray-700 mt-6 mb-3">
-            「{selectedFood}」を使ったレシピ
+        <GlassCard className="p-6 space-y-6">
+          <h2 className="text-xl font-semibold text-gray-800">
+            「{selectedFood}」を主材料に使ったレシピ
           </h2>
-          {matchingRecipes.length > 0 ? (
-            matchingRecipes.map((recipe) => (
-              <GlassCard key={recipe.id} className="p-6 space-y-3">
-                <h3 className="text-xl font-semibold text-gray-800">{recipe.title}</h3>
-                <p className="text-sm text-gray-600">材料: {recipe.ingredients.join(", ")}</p>
-                <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1">
-                  {recipe.steps.map((step, idx) => (
-                    <li key={idx}>{step}</li>
-                  ))}
-                </ol>
-              </GlassCard>
-            ))
+          {loadingMain ? (
+            <Spinner />
+          ) : mainFoodRecipes.length > 0 ? (
+            <>
+              {mainFoodRecipes.map((recipeText, idx) => (
+                <GlassCard key={idx} className="p-4 bg-white/60 backdrop-blur-sm whitespace-pre-wrap">
+                  {normalizeRecipe(recipeText)}
+                </GlassCard>
+              ))}
+              <div className="text-right">
+                <button
+                  onClick={() => setMainReloadKey((prev) => prev + 1)}
+                  className="mt-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
+                >
+                  別のレシピを提案
+                </button>
+              </div>
+            </>
           ) : (
-            <p className="text-gray-500">該当するレシピが見つかりませんでした。</p>
+            <p className="text-gray-500">
+              該当するレシピが見つかりませんでした。
+              <br />
+              食材名の表記（例：あじ／アジ／鯵）を変えてみてください。
+            </p>
           )}
-        </div>
+        </GlassCard>
       )}
+
+      <GlassCard className="p-6 space-y-6">
+        <h2 className="text-xl font-semibold text-gray-800">
+          期限間近の食品を活用したレシピ
+        </h2>
+        {loadingSuggested ? (
+          <Spinner />
+        ) : suggestedRecipes.length > 0 ? (
+          <>
+            {suggestedRecipes.map((recipeText, idx) => (
+              <GlassCard key={idx} className="p-4 bg-white/60 backdrop-blur-sm whitespace-pre-wrap">
+                {normalizeRecipe(recipeText)}
+              </GlassCard>
+            ))}
+            <div className="text-right">
+              <button
+                onClick={() => setSuggestedReloadKey((prev) => prev + 1)}
+                className="mt-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
+              >
+                別のレシピを提案
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="text-gray-500">該当するレシピが見つかりませんでした。</p>
+        )}
+      </GlassCard>
     </div>
   );
 };
