@@ -1,25 +1,50 @@
-# app/services/recipe_chatgpt.py
-
+import json
 import os
+import random
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def generate_recipe_with_chatgpt(ingredients: list[str]) -> str:
+def generate_recipe_with_chatgpt(ingredients: list[str]) -> dict:
+    random.shuffle(ingredients)
+
     prompt = (
-        f"以下の賞味期限が近い食材を優先的に使った、現実的な家庭料理レシピを1つ提案してください。\n"
-        f"必要に応じて、冷蔵庫によくある野菜や調味料（例：玉ねぎ、人参、ネギ、醤油、みりん、酒、塩、こしょう、砂糖、ごま油 など）を補って構いません。\n"
-        f"実在しない奇抜な料理や過剰に創作的な料理は避けてください。\n"
-        f"出力にはレシピ名と材料リストのみを記載し、作り方や手順は省略してください。\n"
-        f"材料リストには、具体的な調味料も含めてください。\n\n"
-        f"【賞味期限が近い食材】：{', '.join(ingredients)}\n\n"
-        f"出力形式：\n"
-        f"レシピ名：〇〇\n"
-        f"材料：〇〇、〇〇、〇〇…"
+        f"以下のすべての食材をまんべんなく使って、複数の家庭料理に分けて提案してください。\n"
+        f"1皿にこだわらず、主菜・副菜・汁物など自由に分けて構いません。\n"
+        f"必要に応じて、玉ねぎ、人参、ネギ、醤油、みりん、酒、塩、こしょう、砂糖、ごま油などの"
+        f"一般的な調味料や冷蔵庫にありそうな食材を補ってください。\n"
+        f"奇抜な創作料理は避け、現実的で作りやすい内容にしてください。\n"
+        f"作り方は不要で、出力は以下のJSON形式で返してください。\n"
+        f"各料理の材料リストでは、材料名と分量を分けて記述し、"
+        f"分量の単位は g, 個, 大さじ◯杯, 小さじ◯杯 など、すべて日本語で表記してください。\n\n"
+        f'''出力形式：
+{{
+  "recipes": [
+    {{
+      "title": "料理名1",
+      "ingredients": [
+        {{
+          "name": "食材名1",
+          "amount": "分量1"
+        }},
+        {{
+          "name": "食材名2",
+          "amount": "分量2"
+        }}
+      ]
+    }},
+    {{
+      "title": "料理名2",
+      "ingredients": [
+        ...
+      ]
+    }}
+  ]
+}}'''
+        f"\n\n使用する食材：{', '.join(ingredients)}"
     )
 
     response = client.chat.completions.create(
@@ -30,15 +55,33 @@ def generate_recipe_with_chatgpt(ingredients: list[str]) -> str:
         ],
     )
 
-    return response.choices[0].message.content
+    content = response.choices[0].message.content.strip()
 
-def generate_recipe_focused_on_main_ingredient(food_name: str) -> str:
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "ChatGPTの出力がJSONとして読み取れませんでした", "raw": content}
+
+def generate_recipe_focused_on_main_ingredient(food_name: str) -> dict:
     prompt = (
-      f"以下の食材「{food_name}」を**主な材料として必ず使って**、"
-      f"実在しない奇抜な料理や過剰に創作的な料理は避けてください。\n"
-      f"他の食材を追加してもよいので1つのレシピを日本語で提案してください。"
-      f"レシピ名と材料のみを箇条書きで出力してください。"
-      f"出力にはレシピ名と材料リストのみを記載し、作り方や手順は省略してください。\n"
+        f"次の食材「{food_name}」を主材料として必ず使い、現実的なレシピを1つ提案してください。\n"
+        f"他の食材を追加しても構いません。\n"
+        f"各材料には材料名と分量を分けて記述し、"
+        f"分量の単位は g, 個, 大さじ◯杯, 小さじ◯杯 など、すべて日本語で表記してください。\n\n"
+        f"出力は次のJSON形式で返してください：\n"
+        f'''{{
+  "title": "レシピ名",
+  "ingredients": [
+    {{
+      "name": "食材名1",
+      "amount": "分量1"
+    }},
+    {{
+      "name": "食材名2",
+      "amount": "分量2"
+    }}
+  ]
+}}'''
     )
 
     response = client.chat.completions.create(
@@ -49,4 +92,9 @@ def generate_recipe_focused_on_main_ingredient(food_name: str) -> str:
         ],
     )
 
-    return response.choices[0].message.content
+    content = response.choices[0].message.content.strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "ChatGPTの出力がJSONとして読み取れませんでした", "raw": content}
