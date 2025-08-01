@@ -1,14 +1,26 @@
-// frontend/src/components/barcode/BarcodeScanner.tsx
+// frontend/src/components/barcode/BarcodeScanner.tsx - 汎用化版
 import React, { useEffect, useState } from "react";
 import {
   useBarcodeScanner,
   useCameraPermission,
 } from "../../hooks/useBarcodeScanner";
 import { formatISBN } from "../../utils/isbnValidator";
+import {
+  type BarcodeValidationResult,
+  type BarcodeType,
+  formatBarcode,
+} from "../../utils/barcodeValidator";
 import { GlassCard, GlassButton, GlassError } from "../ui/GlassUI";
 
 interface BarcodeScannerProps {
-  onISBNDetected: (isbn: string) => void;
+  // ✅ 既存のISBN専用プロパティ（後方互換性）
+  onISBNDetected?: (isbn: string) => void;
+
+  // ✅ 新規追加: 汎用バーコード検出プロパティ
+  onBarcodeDetected?: (result: BarcodeValidationResult) => void;
+  supportedTypes?: BarcodeType[];
+
+  // ✅ 既存のプロパティ（変更なし）
   onClose: () => void;
   title?: string;
   subtitle?: string;
@@ -16,9 +28,11 @@ interface BarcodeScannerProps {
 
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   onISBNDetected,
+  onBarcodeDetected,
+  supportedTypes = ["ISBN"], // デフォルトはISBNのみ（既存動作を維持）
   onClose,
   title = "バーコードスキャン",
-  subtitle = "書籍のISBNバーコードをカメラに向けてください",
+  subtitle = "バーコードをカメラに向けてください",
 }) => {
   const {
     isScanning,
@@ -27,39 +41,48 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
     videoRef,
     startScanning,
     stopScanning,
-    onISBNDetected: registerCallback,
+    onBarcodeDetected: registerCallback, // ✅ フック側も汎用化予定
     clearError,
   } = useBarcodeScanner({
     preferBackCamera: true,
     continuousScan: false,
     scanDelay: 1000,
+    supportedTypes, // ✅ 新規: サポートするバーコード種別
   });
 
   const cameraPermission = useCameraPermission();
-  const [detectedISBN, setDetectedISBN] = useState<string | null>(null);
+  const [detectedBarcode, setDetectedBarcode] =
+    useState<BarcodeValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   /**
-   * ISBN検出時の処理
+   * バーコード検出時の処理（汎用化）
    */
   useEffect(() => {
-    registerCallback(async (isbn: string) => {
-      console.log("📚 ISBN検出コールバック:", isbn);
+    registerCallback(async (result: BarcodeValidationResult) => {
+      console.log(`📷 ${result.type}検出:`, result.formattedCode);
 
-      setDetectedISBN(isbn);
+      setDetectedBarcode(result);
       setIsProcessing(true);
 
       try {
-        // 親コンポーネントに通知
-        await onISBNDetected(isbn);
+        // ✅ 既存のISBN専用コールバック（後方互換性）
+        if (result.type === "ISBN" && onISBNDetected) {
+          await onISBNDetected(result.cleanCode);
+        }
+
+        // ✅ 新規: 汎用バーコードコールバック
+        if (onBarcodeDetected) {
+          await onBarcodeDetected(result);
+        }
       } catch (error) {
-        console.error("ISBN処理エラー:", error);
+        console.error("バーコード処理エラー:", error);
         // エラーが発生した場合はスキャンを再開可能にする
         setIsProcessing(false);
-        setDetectedISBN(null);
+        setDetectedBarcode(null);
       }
     });
-  }, [registerCallback, onISBNDetected]);
+  }, [registerCallback, onISBNDetected, onBarcodeDetected]);
 
   /**
    * コンポーネントのクリーンアップ
@@ -75,7 +98,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
    */
   const handleStartScanning = async () => {
     clearError();
-    setDetectedISBN(null);
+    setDetectedBarcode(null);
     setIsProcessing(false);
     await startScanning();
   };
@@ -85,7 +108,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
    */
   const handleStopScanning = () => {
     stopScanning();
-    setDetectedISBN(null);
+    setDetectedBarcode(null);
     setIsProcessing(false);
   };
 
@@ -95,6 +118,56 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   const handleClose = () => {
     handleStopScanning();
     onClose();
+  };
+
+  /**
+   * サポートされているバーコード種別の表示テキスト
+   */
+  const getSupportedTypesText = (): string => {
+    if (supportedTypes.includes("ISBN") && supportedTypes.length === 1) {
+      return "書籍のISBNバーコード";
+    }
+
+    const typeNames = supportedTypes.map((type) => {
+      switch (type) {
+        case "ISBN":
+          return "書籍(ISBN)";
+        case "JAN":
+          return "商品(JAN)";
+        case "EAN":
+          return "商品(EAN)";
+        default:
+          return type;
+      }
+    });
+
+    return typeNames.join("、");
+  };
+
+  /**
+   * バーコード種別に応じたアイコン
+   */
+  const getBarcodeIcon = (type: BarcodeType): string => {
+    switch (type) {
+      case "ISBN":
+        return "📚";
+      case "JAN":
+        return "🛒";
+      case "EAN":
+        return "🏷️";
+      default:
+        return "📄";
+    }
+  };
+
+  /**
+   * フォーマット関数の選択（後方互換性）
+   */
+  const formatDetectedCode = (result: BarcodeValidationResult): string => {
+    if (result.type === "ISBN") {
+      return formatISBN(result.cleanCode); // 既存のフォーマット関数を使用
+    }
+    return result.formattedCode;
   };
 
   /**
@@ -169,7 +242,29 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           <span className="mr-3">📷</span>
           {title}
         </h3>
-        <p className="text-gray-600 mb-6">{subtitle}</p>
+        <p className="text-gray-600 mb-6">
+          {subtitle || `${getSupportedTypesText()}をカメラに向けてください`}
+        </p>
+
+        {/* サポートされているバーコード種別の表示 */}
+        {supportedTypes.length > 1 && (
+          <div className="mb-4 p-3 bg-blue-50/30 backdrop-blur-sm rounded-xl border border-blue-200/30">
+            <div className="text-sm text-blue-800">
+              <span className="font-medium">対応バーコード:</span>
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                {supportedTypes.map((type) => (
+                  <span
+                    key={type}
+                    className="inline-flex items-center px-2 py-1 bg-blue-100/50 rounded-lg text-xs"
+                  >
+                    <span className="mr-1">{getBarcodeIcon(type)}</span>
+                    {type}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* カメラビューエリア */}
         <div className="relative mb-6">
@@ -188,8 +283,12 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
               <div className="relative">
                 <div className="w-64 h-40 border-2 border-white border-dashed rounded-lg bg-black/20 backdrop-blur-sm flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-white text-sm mb-2">📚</div>
-                    <p className="text-white text-xs">ISBNバーコードをここに</p>
+                    <div className="text-white text-sm mb-2">
+                      {supportedTypes.length === 1
+                        ? getBarcodeIcon(supportedTypes[0])
+                        : "📄"}
+                    </div>
+                    <p className="text-white text-xs">バーコードをここに</p>
                   </div>
                 </div>
 
@@ -207,10 +306,15 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
               <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
                 <div className="text-center text-white">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                  <p className="text-lg font-medium">書籍情報を取得中...</p>
-                  {detectedISBN && (
+                  <p className="text-lg font-medium">
+                    {detectedBarcode?.type === "ISBN"
+                      ? "書籍情報を取得中..."
+                      : "商品情報を処理中..."}
+                  </p>
+                  {detectedBarcode && (
                     <p className="text-sm opacity-75 mt-2">
-                      ISBN: {formatISBN(detectedISBN)}
+                      {detectedBarcode.type}:{" "}
+                      {formatDetectedCode(detectedBarcode)}
                     </p>
                   )}
                 </div>
@@ -239,13 +343,14 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           </div>
         )}
 
-        {/* 検出されたISBN表示 */}
-        {detectedISBN && !isProcessing && (
+        {/* 検出されたバーコード表示 */}
+        {detectedBarcode && !isProcessing && (
           <div className="mb-6 p-4 bg-green-50/50 backdrop-blur-sm rounded-xl border border-green-200/30">
             <div className="flex items-center justify-center space-x-2">
               <span className="text-green-600">✅</span>
               <span className="font-medium text-green-800">
-                ISBN検出: {formatISBN(detectedISBN)}
+                {detectedBarcode.type}検出:{" "}
+                {formatDetectedCode(detectedBarcode)}
               </span>
             </div>
           </div>
@@ -319,7 +424,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
 };
 
 /**
- * カメラ権限確認用のコンポーネント
+ * カメラ権限確認用のコンポーネント（変更なし）
  */
 export const CameraPermissionGuard: React.FC<{ children: React.ReactNode }> = ({
   children,

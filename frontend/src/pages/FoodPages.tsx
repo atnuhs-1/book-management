@@ -14,6 +14,8 @@ const foodCategories = [
   { id: "SNACKS", name: "お菓子", icon: "🍪" },
 ];
 
+const quantityUnits = ["g", "個"];
+
 export const FoodPage = () => {
   const { token } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -85,6 +87,7 @@ export const FoodPage = () => {
     name: "",
     category: "",
     quantity: "",
+    unit: "g",
     expiration_date: "",
   });
 
@@ -94,6 +97,7 @@ export const FoodPage = () => {
       name: item.name,
       category: item.category,
       quantity: String(item.quantity),
+      unit: item.unit,
       expiration_date: item.expiration_date,
     });
   };
@@ -112,6 +116,7 @@ export const FoodPage = () => {
           name: editForm.name.trim(),
           category: editForm.category,
           quantity: Number(editForm.quantity),
+          unit: editForm.unit,
           expiration_date: editForm.expiration_date,
         }),
       });
@@ -180,7 +185,9 @@ export const FoodPage = () => {
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex justify-between">
                 <span>数量</span>
-                <span className="text-gray-800 font-medium">{item.quantity}</span>
+                <span className="text-gray-800 font-medium">
+                  {item.quantity} {item.unit}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>期限</span>
@@ -206,77 +213,89 @@ export const FoodPage = () => {
       </div>
 
       {editingItem && (
-  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-    <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
-      <h2 className="text-lg font-semibold text-gray-800">食品情報の編集</h2>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-gray-800">食品情報の編集</h2>
 
-      <div className="space-y-3">
-        <label className="block">
-          <span className="text-sm text-gray-600">食品名</span>
-          <input
-            type="text"
-            value={editForm.name}
-            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-            className="mt-1 w-full rounded border-gray-300 shadow-sm"
-          />
-        </label>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-sm text-gray-600">食品名</span>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                />
+              </label>
 
-        <label className="block">
-          <span className="text-sm text-gray-600">カテゴリ</span>
-          <select
-            value={editForm.category}
-            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-            className="mt-1 w-full rounded border-gray-300 shadow-sm"
-          >
-            {foodCategories
-              .filter((c) => c.id !== "all")
-              .map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </label>
+              <label className="block">
+                <span className="text-sm text-gray-600">カテゴリ</span>
+                <select
+                  value={editForm.category}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                >
+                  {foodCategories
+                    .filter((c) => c.id !== "all")
+                    .map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
 
-        <label className="block">
-          <span className="text-sm text-gray-600">数量</span>
-          <input
-            type="number"
-            value={editForm.quantity}
-            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-            className="mt-1 w-full rounded border-gray-300 shadow-sm"
-          />
-        </label>
+              <label className="block">
+                <span className="text-sm text-gray-600">数量</span>
+                <input
+                  type="number"
+                  value={editForm.quantity}
+                  onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                  className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                />
+              </label>
 
-        <label className="block">
-          <span className="text-sm text-gray-600">賞味/消費期限</span>
-          <input
-            type="date"
-            value={editForm.expiration_date}
-            onChange={(e) => setEditForm({ ...editForm, expiration_date: e.target.value })}
-            className="mt-1 w-full rounded border-gray-300 shadow-sm"
-          />
-        </label>
-      </div>
+              <label className="block">
+                <span className="text-sm text-gray-600">単位</span>
+                <select
+                  value={editForm.unit}
+                  onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                  className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                >
+                  {quantityUnits.map((unit) => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </label>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <button
-          onClick={() => setEditingItem(null)}
-          className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
-        >
-          キャンセル
-        </button>
-        <button
-          onClick={handleUpdate}
-          className="px-4 py-2 text-sm rounded text-white bg-green-500 hover:bg-green-600"
-        >
-          保存
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              <label className="block">
+                <span className="text-sm text-gray-600">賞味/消費期限</span>
+                <input
+                  type="date"
+                  value={editForm.expiration_date}
+                  onChange={(e) => setEditForm({ ...editForm, expiration_date: e.target.value })}
+                  className="mt-1 w-full rounded border-gray-300 shadow-sm"
+                />
+              </label>
+            </div>
 
+            <div className="flex justify-end gap-2 pt-4">
+              <button
+                onClick={() => setEditingItem(null)}
+                className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleUpdate}
+                className="px-4 py-2 text-sm rounded text-white bg-green-500 hover:bg-green-600"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

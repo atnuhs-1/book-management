@@ -98,15 +98,15 @@ export const Layout = ({ children }: LayoutProps) => {
           { label: "ホーム", path: "/" },
           { label: "食品一覧", path: "/food-list" },
           { label: "食品追加", path: "/add-food" },
-        ];  
-      
+        ];
+
       case "/recipes":
         return [
           { label: "ホーム", path: "/" },
           { label: "食品一覧", path: "/food-list" },
           { label: "レシピ提案", path: "/recipes" },
-        ];  
-        
+        ];
+
       case "/book-list":
         return [
           { label: "ホーム", path: "/" },
@@ -327,7 +327,7 @@ export const Layout = ({ children }: LayoutProps) => {
       </header>
 
       {/* メインコンテンツ */}
-      <main className="relative px-4 sm:px-6 lg:px-8 py-8 pb-20 md:pb-8 bg-white dark:bg-gray-900 transition-colors">
+      <main className="flex-1 relative px-4 sm:px-6 lg:px-8 py-8 pb-20 md:pb-8 bg-white dark:bg-gray-900 transition-colors">
         {/* ブレッドクラム */}
         {breadcrumbs.length > 1 && (
           <div className="max-w-6xl mx-auto mb-6">
@@ -356,7 +356,7 @@ export const Layout = ({ children }: LayoutProps) => {
         {/* サブナビゲーション */}
         {(location.pathname.startsWith("/food") ||
           location.pathname === "/expiry" ||
-          location.pathname === "/add-food" ||  
+          location.pathname === "/add-food" ||
           location.pathname === "/recipes" ) && (
           <div className="max-w-6xl mx-auto mb-6">
             <div className="bg-white/20 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
