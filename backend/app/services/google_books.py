@@ -7,8 +7,6 @@ import time
 from dotenv import load_dotenv
 from typing import List
 
-# from app.services.rakuten_books import supplement_isbn_with_rakuten
-
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY")
 RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID")
@@ -176,6 +174,30 @@ def supplement_isbn_with_rakuten(books: List[dict]) -> List[dict]:
         supplemented_books.append(book)
 
     return supplemented_books
+
+def ensure_isbn_or_raise(book: dict) -> str:
+    isbn = book.get("isbn")
+    if isbn:
+        return isbn
+
+    title = book.get("title")
+    if not title:
+        raise ValueError("タイトルがありません。ISBNを補完できません。")
+
+    rakuten_results = search_books_by_title_rakuten(title)
+    matched = next(
+        (item for item in rakuten_results
+         if normalize_title(item["title"]) == normalize_title(title)),
+        None
+    )
+
+    if matched and matched.get("isbn"):
+        isbn = matched["isbn"]
+        book["isbn"] = isbn  # 更新
+        print(f"✅ ISBN補完成功: {title} → {isbn}")
+        return isbn
+
+    raise ValueError(f"ISBNが取得できませんでした（Googleにも楽天にもありません）：{title}")
 
 # if __name__ == "__main__":
 #     test_title = "ブルーロック（１８）"
