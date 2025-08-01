@@ -64,6 +64,78 @@ export const FoodPage = () => {
     (cat) => cat.id === selectedCategory
   );
 
+  const handleDelete = async (id: number) => {
+    const confirmDelete = window.confirm("この食品を削除しますか？");
+    if (!confirmDelete) return;
+  
+    try {
+      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+  
+      if (!res.ok) throw new Error("削除に失敗しました");
+  
+      // 成功したら一覧から削除
+      setFoodItems((prev) => prev.filter((item: any) => item.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("削除に失敗しました");
+    }
+  };
+
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    quantity: "",
+    expiration_date: "",
+  });
+
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setEditForm({
+      name: item.name,
+      category: item.category,
+      quantity: String(item.quantity),
+      expiration_date: item.expiration_date,
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editingItem) return;
+  
+    try {
+      const res = await fetch(`http://localhost:8000/api/foods/${editingItem.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          category: editForm.category,
+          quantity: Number(editForm.quantity),
+          expiration_date: editForm.expiration_date,
+        }),
+      });
+  
+      if (!res.ok) throw new Error("更新に失敗しました");
+  
+      const updated = await res.json();
+      setFoodItems((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      setEditingItem(null); // モーダルを閉じる
+    } catch (err) {
+      console.error(err);
+      alert("更新に失敗しました");
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -179,9 +251,96 @@ export const FoodPage = () => {
                 </span>
               </div>
             </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => handleEdit(item)}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                ✏️ 編集
+              </button>
+              <button
+                onClick={() => handleDelete(item.id)}
+                className="text-sm text-red-600 hover:underline"
+              >
+                🗑️ 削除
+              </button>
+              </div>
           </GlassCard>
         ))}
       </div>
+
+          {editingItem && (
+      <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6 space-y-4">
+          <h2 className="text-lg font-medium text-gray-800 text-center">食品を編集</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleUpdate();
+            }}
+            className="space-y-4"
+          >
+            <input
+              type="text"
+              className="w-full border px-3 py-2 rounded"
+              placeholder="商品名"
+              value={editForm.name}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, name: e.target.value }))
+              }
+              required
+            />
+            <input
+              type="text"
+              className="w-full border px-3 py-2 rounded"
+              placeholder="カテゴリ"
+              value={editForm.category}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, category: e.target.value }))
+              }
+              required
+            />
+            <input
+              type="number"
+              className="w-full border px-3 py-2 rounded"
+              placeholder="数量"
+              value={editForm.quantity}
+              min={1}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, quantity: e.target.value }))
+              }
+              required
+            />
+            <input
+              type="date"
+              className="w-full border px-3 py-2 rounded"
+              value={editForm.expiration_date}
+              onChange={(e) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  expiration_date: e.target.value,
+                }))
+              }
+              required
+            />
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition"
+            >
+              保存
+            </button>
+          </form>
+          <div className="flex justify-center pt-2">
+            <button
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+              onClick={() => setEditingItem(null)}
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
 
       {filteredItems.length === 0 && (
         <div className="text-center py-16">
