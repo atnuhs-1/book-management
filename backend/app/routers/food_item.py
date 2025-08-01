@@ -7,8 +7,7 @@ from app.models.food_item import FoodCategory
 from app.models.user import User
 from app.schemas.food_item import FoodItemCreate, FoodItemRead
 from app.services.hybrid_recipe import hybrid_recipe_suggestion
-from app.services.recipe_chatgpt import \
-    generate_recipe_focused_on_main_ingredient
+from app.services.recipe_chatgpt import generate_recipe_focused_on_main_ingredient
 from app.services.validate_category import validate_food_category
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -53,7 +52,7 @@ def fetch_jancode_product(barcode: str) -> tuple[dict, str]:
             "message": "商品が見つかりません（API上）",
             "requested_url": full_url,
             "web_fallback_url": f"https://www.jancodelookup.com/code/{barcode}",
-            "raw_api_response": json_data  # デバッグ用に出力
+            "raw_api_response": json_data
         })
 
     return result[0], full_url
@@ -68,13 +67,15 @@ def preview_food_info(
     item, full_url = fetch_jancode_product(barcode)
     details = item.get("ProductDetails", {})
 
+    print("JAN APIからの単品容量:", details.get("単品容量"))
+
     # 数量の算出
     try:
         total_volume = int(details.get("内容量", "").replace("ml", "").replace("ML", "").strip())
     except:
         total_volume = None
     try:
-        unit_volume = int(details.get("単品容量", "").replace("ml", "").strip())
+        unit_volume = int(details.get("単品容量", "").replace("ml", "").replace("ML", "").strip())
     except:
         unit_volume = None
     try:
@@ -82,8 +83,15 @@ def preview_food_info(
     except:
         quantity = None
 
-   #if not quantity and total_volume and unit_volume and unit_volume > 0:
-    quantity = total_volume / unit_volume
+    # 安全な計算
+    if quantity is None:
+        if total_volume is not None and unit_volume not in (None, 0):
+            try:
+                quantity = total_volume / unit_volume
+            except ZeroDivisionError:
+                quantity = 1
+        else:
+            quantity = 1
 
     return {
         "requested_url": full_url,
@@ -93,7 +101,7 @@ def preview_food_info(
         "maker": item.get("makerName"),
         "image_url": item.get("itemImageUrl"),
         "details": details,
-        "calculated_quantity": quantity or 1
+        "calculated_quantity": quantity
     }
 
 
@@ -122,6 +130,7 @@ def create_food(
 
     return crud_food.create_food_item(db, current_user.id, food)
 
+
 # ✅ GET /api/me/foods
 @router.get("/me/foods", response_model=list[FoodItemRead])
 def get_my_foods(
@@ -130,7 +139,8 @@ def get_my_foods(
 ):
     return crud_food.get_food_items_by_user_id(db, current_user.id)
 
-# ✅ GET /api/foods/by_category（← ⚠️ この順番が重要）
+
+# ✅ GET /api/foods/by_category
 @router.get("/foods/by_category", response_model=list[FoodItemRead])
 def get_foods_by_category(
     category: FoodCategory = Query(...),
@@ -138,6 +148,7 @@ def get_foods_by_category(
     current_user: User = Depends(get_current_user)
 ):
     return crud_food.get_food_items_by_category(db, current_user.id, category)
+
 
 # ✅ GET /api/foods/expiring_soon
 @router.get("/foods/expiring_soon", response_model=list[FoodItemRead])
@@ -150,6 +161,7 @@ def get_expiring_foods(
     deadline = today + timedelta(days=days)
     return crud_food.get_expiring_food_items(db, current_user.id, today, deadline)
 
+
 # ✅ GET /api/foods/categories
 @router.get("/foods/categories", response_model=list[FoodCategory])
 def get_used_categories(
@@ -158,8 +170,8 @@ def get_used_categories(
 ):
     return crud_food.get_used_categories(db, current_user.id)
 
-# app/routers/food_item.p
 
+# ✅ GET /api/foods/recipe_suggestions
 @router.get("/foods/recipe_suggestions")
 def get_hybrid_recipes(
     db: Session = Depends(get_db),
@@ -174,8 +186,8 @@ def get_hybrid_recipes(
 
     return hybrid_recipe_suggestion(ingredients)
 
-# ✅ GET /api/foods/recipe_by_main_food
 
+# ✅ GET /api/foods/recipe_by_main_food
 @router.get("/foods/recipe_by_main_food")
 def get_recipe_by_main_food(
     food_name: str = Query(..., description="主材料とする食材名"),
@@ -194,6 +206,7 @@ def get_recipe_by_main_food(
         "recipes": [generate_recipe_focused_on_main_ingredient(food_name)]
     }
 
+
 # ✅ GET /api/foods/{food_id}
 @router.get("/foods/{food_id}", response_model=FoodItemRead)
 def get_food(
@@ -206,6 +219,7 @@ def get_food(
         raise HTTPException(status_code=404, detail="Food not found")
     return food
 
+
 # ✅ PUT /api/foods/{food_id}
 @router.put("/foods/{food_id}", response_model=FoodItemRead)
 def update_food(
@@ -215,6 +229,7 @@ def update_food(
     current_user: User = Depends(get_current_user)
 ):
     return crud_food.update_food_item(db, food_id, food_update, current_user.id)
+
 
 # ✅ DELETE /api/foods/{food_id}
 @router.delete("/foods/{food_id}")
