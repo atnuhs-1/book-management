@@ -1,6 +1,8 @@
-from pydantic import BaseModel
 from datetime import date
 from enum import Enum
+
+from pydantic import BaseModel, Field, field_validator
+
 
 class FoodCategory(str, Enum):
     FRESH = "生鮮食品"
@@ -10,11 +12,19 @@ class FoodCategory(str, Enum):
     FROZEN = "冷凍食品"
     SNACKS = "お菓子"
 
+
 class FoodItemBase(BaseModel):
     name: str
     category: FoodCategory
-    quantity: int
+    quantity: int = Field(..., description="1以上の数量を入力してください")
     expiration_date: date
+
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity(cls, v):
+        if v <= 0:
+            raise ValueError("在庫はありません（quantityは1以上にしてください）")
+        return v
 
 class FoodItemCreate(FoodItemBase):
     pass
