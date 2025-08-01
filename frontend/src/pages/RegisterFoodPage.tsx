@@ -6,24 +6,27 @@ import { useAuthStore } from "../stores/authStore";
 
 const foodCategories = [
   { id: "FRESH", name: "生鮮食品", icon: "🥬" },
-  { id: "EMERGENCY", name: "非常食", icon: "🥫" },
+  { id: "EMERGENCY", name: "非常食", icon: "🥢" },
   { id: "BEVERAGES", name: "飲料", icon: "🥤" },
-  { id: "SEASONINGS", name: "調味料", icon: "🧂" },
-  { id: "FROZEN", name: "冷凍食品", icon: "🧊" },
+  { id: "SEASONINGS", name: "調味料", icon: "🠂" },
+  { id: "FROZEN", name: "冷凍食品", icon: "🧨" },
   { id: "SNACKS", name: "お菓子", icon: "🍪" },
 ];
+
+const quantityUnits = ["g", "個"];
 
 type FoodItem = {
   name: string;
   category: string;
   expiration_date: string;
   quantity: string;
+  unit: string;
 };
 
 export const RegisterFoodPage = () => {
   const { token } = useAuthStore();
   const [mode, setMode] = useState<"manual" | "barcode" | null>(null);
-  const [food, setFood] = useState<Partial<FoodItem>>({ quantity: "1" });
+  const [food, setFood] = useState<Partial<FoodItem>>({ quantity: "1", unit: "g" });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const simulateBarcodeScan = () => {
@@ -31,6 +34,7 @@ export const RegisterFoodPage = () => {
       name: "カップラーメン",
       category: "emergency",
       quantity: "1",
+      unit: "個"
     });
   };
 
@@ -40,7 +44,7 @@ export const RegisterFoodPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!food.name || !food.category || !food.expiration_date || !food.quantity || Number(food.quantity) < 1) {
+    if (!food.name || !food.category || !food.expiration_date || !food.quantity || !food.unit || Number(food.quantity) < 1) {
       alert("すべての項目を正しく入力してください");
       return;
     }
@@ -54,8 +58,9 @@ export const RegisterFoodPage = () => {
         },
         body: JSON.stringify({
           name: food.name.trim(),
-          category: selectedCategory?.name || "", // ✅ 日本語のEnum名を送信
+          category: selectedCategory?.name || "",
           quantity: Number(food.quantity),
+          unit: food.unit,
           expiration_date: food.expiration_date,
         }),
       });
@@ -65,7 +70,7 @@ export const RegisterFoodPage = () => {
       }
 
       alert("食品を登録しました！");
-      setFood({ quantity: "1" });
+      setFood({ quantity: "1", unit: "g" });
       setMode(null);
     } catch (err) {
       alert("登録中にエラーが発生しました");
@@ -151,6 +156,19 @@ export const RegisterFoodPage = () => {
                 onChange={(e) => handleChange("quantity", e.target.value)}
               />
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">単位</label>
+                <select
+                  className="w-full rounded border-gray-300 shadow-sm"
+                  value={food.unit || "g"}
+                  onChange={(e) => handleChange("unit", e.target.value)}
+                >
+                  {quantityUnits.map((unit) => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+
               <GlassInput
                 label="賞味/消費期限"
                 type="date"
@@ -167,7 +185,7 @@ export const RegisterFoodPage = () => {
                   type="button"
                   variant="secondary"
                   onClick={() => {
-                    setFood({ quantity: "1" });
+                    setFood({ quantity: "1", unit: "g" });
                     setMode(null);
                   }}
                 >
