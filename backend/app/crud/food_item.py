@@ -1,11 +1,13 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from app.schemas.food_item import FoodItemCreate
 from datetime import date
-from app.models.food_item import FoodItem, FoodCategory  # ✅ 追加
+
+from app.models.food_item import FoodCategory, FoodItem
+from app.schemas.food_item import FoodItemCreate
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 
 def create_food_item(db: Session, user_id: int, item: FoodItemCreate):
-    db_item = FoodItem(**item.dict(), user_id=user_id)
+    db_item = FoodItem(**item.dict(), user_id=user_id)  # ✅ unitも含まれている
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
@@ -21,7 +23,7 @@ def update_food_item(db: Session, food_id: int, item: FoodItemCreate, user_id: i
     db_item = get_food_item_by_id(db, food_id)
     if not db_item or db_item.user_id != user_id:
         raise HTTPException(status_code=404, detail="Food not found")
-    for field, value in item.dict().items():
+    for field, value in item.dict().items():  # ✅ unit も更新される
         setattr(db_item, field, value)
     db.commit()
     db.refresh(db_item)
