@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 from app.services.google_books import fetch_book_info_by_isbn
 
 
+from datetime import datetime
+
+from pytz import timezone
+
+
 def create_book(db: Session, book: BookCreate, user_id: int) -> Book:
     genres = []
 
@@ -50,10 +55,6 @@ def get_books_by_user_id_and_status(db: Session, user_id: int, status: BookStatu
         Book.user_id == user_id,
         Book.status == status
     ).all()
-
-from datetime import datetime
-
-from pytz import timezone
 
 
 def get_books_releasing_tomorrow(db: Session):

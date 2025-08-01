@@ -35,4 +35,4 @@ class Book(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="books")
     genres = Column(JSON, nullable=False, default=[])
-    isbn = Column(String(13), nullable=True, unique=False) # いるかわからん。いらんかったら消して
+    isbn = Column(String(13), nullable=True, unique=False)

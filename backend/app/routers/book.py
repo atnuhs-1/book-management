@@ -9,7 +9,6 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import book as crud_book
 from app.models.book import Book, BookStatusEnum
-from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
 from app.services.utils import extract_volume, parse_published_date
@@ -18,6 +17,7 @@ from app.services.google_books import (
     search_books_by_title,
     search_books_by_title_rakuten,
     normalize_title,
+    ensure_isbn_or_raise,
 )
 
 router = APIRouter()
@@ -38,15 +38,65 @@ def register_book_by_isbn(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    isbn = payload.isbn
-    if not isbn.isdigit():
-        raise HTTPException(status_code=400, detail="有効なISBNではありません")
+    book_data = {"isbn": payload.isbn}
+    try:
+        isbn = ensure_isbn_or_raise(book_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     book_info = fetch_book_info_by_isbn(isbn)
     if not book_info:
         raise HTTPException(status_code=404, detail=f"ISBN '{isbn}' の書籍情報が見つかりませんでした")
 
-    # ✅ 重複チェック
+    existing_book = db.query(Book).filter(Book.isbn == isbn, Book.user_id == current_user.id).first()
+    if existing_book:
+        if existing_book.status == BookStatusEnum.OWNED:
+            raise HTTPException(status_code=400, detail="すでに所持しています。")
+        existing_book.status = BookStatusEnum.OWNED
+        db.commit()
+        db.refresh(existing_book)
+        return existing_book
+
+    volume = extract_volume(book_info["title"]) or ""
+    pub_date = parse_published_date(book_info.get("published_date"))
+    author = ", ".join(book_info.get("authors", [])) if isinstance(book_info.get("authors"), list) else book_info.get("authors", "")
+
+    new_book = BookCreate(
+        title=book_info["title"],
+        volume=volume,
+        author=author,
+        publisher=book_info.get("publisher", ""),
+        cover_image_url=book_info.get("cover_image_url", ""),
+        published_date=pub_date,
+        status=BookStatusEnum.OWNED,
+        isbn=isbn,
+        is_favorite=False,
+        genres=book_info.get("genres", [])
+    )
+
+    return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
+
+@router.post("/books/register-by-title", response_model=BookOut)
+def register_book_by_title(
+    title: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # ✅ タイトル検索（Google Books）
+    books = search_books_by_title(title)
+    if not books:
+        raise HTTPException(status_code=404, detail=f"Google Booksに '{title}' の書籍が見つかりませんでした")
+
+    # ✅ 最初の検索結果を採用（候補数が多ければ拡張可）
+    book_data = books[0]
+
+    # ✅ ISBN補完（必要であれば楽天APIを使用）
+    try:
+        isbn = ensure_isbn_or_raise(book_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    # ✅ 既存書籍の確認
     existing_book = db.query(Book).filter(
         Book.isbn == isbn,
         Book.user_id == current_user.id
@@ -55,34 +105,33 @@ def register_book_by_isbn(
     if existing_book:
         if existing_book.status == BookStatusEnum.OWNED:
             raise HTTPException(status_code=400, detail="すでに所持しています。")
-        else:
+        elif existing_book.status in [BookStatusEnum.WISHLIST, BookStatusEnum.NOT_OWNED]:
             existing_book.status = BookStatusEnum.OWNED
             db.commit()
             db.refresh(existing_book)
             return existing_book
 
-    volume = extract_volume(book_info["title"]) or ""
-    pub_date_str = book_info.get("published_date")
-    pub_date = parse_published_date(pub_date_str)
-    genres = book_info.get("categories") or []
+    # ✅ 新規登録
+    volume = extract_volume(book_data["title"]) or ""
+    pub_date = parse_published_date(book_data.get("published_date"))
 
-    raw_authors = book_info.get("authors")
+    raw_authors = book_data.get("authors")
     if isinstance(raw_authors, list):
         author = ", ".join(raw_authors)
     else:
         author = raw_authors or ""
 
     new_book = BookCreate(
-        title=book_info["title"],
+        title=book_data["title"],
         volume=volume,
         author=author,
-        publisher=book_info.get("publisher", "") or "",
-        cover_image_url=book_info.get("cover_image_url", "") or "https://msp.c.yimg.jp/images/v2/FUTi93tXq405grZVGgDqGxFd07OLhx_m__6r2FpK2Um4tuuTp9RnKlnMuBJBv3Gdy4iZTldufLUyozbcCsSNUUE_iB1EInDgaZAMBGMmvZ7viMxLW7VaxnTNc7LZcvKO3xizbs_ovgVJkkmIP9y0ID-iWtqDwjQrm31HjeQnA0LfHFadohvEGY2xDtza2Vck1BCKZoADOcAld3yzXRTgdHLcTdqSVSsIZXoYyf16iviAQoZS0yY8OiztkD6wFCZDpp4QeLJJv_8FCsuGuzwPF6DwLtWor8vl9ORLFPI_f3jU_T57C0pg4bIyWBt-xiQ-PdtoNor6gMe7lVKlioFR9pMbED6p8XCno56zkwyuqYbRvef8_vF-QdW36RHZJjeg8o6zQcPYl1uIAxkvjQDVUg==/noimage_E38392E3829AE382AFE38388-760x460.png",
+        publisher=book_data.get("publisher", "") or "",
+        cover_image_url=book_data.get("cover_image_url", "") or "https://example.com/default_cover.png",
         published_date=pub_date,
         status=BookStatusEnum.OWNED,
         isbn=isbn,
         is_favorite=False,
-        genres=book_info.get("genres") or []
+        genres=book_data.get("genres") or []
     )
 
     return crud_book.create_book(db=db, book=new_book, user_id=current_user.id)
@@ -94,58 +143,37 @@ def register_to_wishlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    title = book_data.get("title")
-    authors = book_data.get("authors", [])
-    publisher = book_data.get("publisher", "")
-    cover_image_url = book_data.get("cover_image_url", "")
-    published_date_str = book_data.get("published_date")
-    genres = book_data.get("genres", [])
-    isbn = book_data.get("isbn")
+    try:
+        isbn = ensure_isbn_or_raise(book_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    if not isbn:
-        rakuten_results = search_books_by_title_rakuten(title)
-        matched = next(
-            (item for item in rakuten_results
-             if normalize_title(item["title"]) == normalize_title(title)),
-            None
-        )
-        if not matched:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="ISBNが見つかりませんでした（楽天Booksでも補完できませんでした）"
-            )
-        isbn = matched.get("isbn")
-
-    existing_book = db.query(Book).filter(
-        Book.isbn == isbn,
-        Book.user_id == current_user.id
-    ).first()
-
+    existing_book = db.query(Book).filter(Book.isbn == isbn, Book.user_id == current_user.id).first()
     if existing_book:
         if existing_book.status == BookStatusEnum.OWNED:
             raise HTTPException(status_code=400, detail="すでに所持しています。")
-        elif existing_book.status == BookStatusEnum.WISHLIST:
+        if existing_book.status == BookStatusEnum.WISHLIST:
             raise HTTPException(status_code=400, detail="すでにウィッシュリストに追加されています。")
-        elif existing_book.status == BookStatusEnum.NOT_OWNED:
-            existing_book.status = BookStatusEnum.WISHLIST
-            db.commit()
-            db.refresh(existing_book)
-            return existing_book
+        existing_book.status = BookStatusEnum.WISHLIST
+        db.commit()
+        db.refresh(existing_book)
+        return existing_book
 
-    volume = extract_volume(title) or ""
-    pub_date = parse_published_date(published_date_str)
+    volume = extract_volume(book_data.get("title", "")) or ""
+    pub_date = parse_published_date(book_data.get("published_date"))
+    author = ", ".join(book_data.get("authors", []))
 
     new_book = Book(
-        title=title,
+        title=book_data.get("title", ""),
         volume=volume,
-        author=", ".join(authors),
-        publisher=publisher,
-        cover_image_url=cover_image_url,
+        author=author,
+        publisher=book_data.get("publisher", ""),
+        cover_image_url=book_data.get("cover_image_url", ""),
         published_date=pub_date,
         status=BookStatusEnum.WISHLIST,
         is_favorite=False,
         user_id=current_user.id,
-        genres=genres,
+        genres=book_data.get("genres", []),
         isbn=isbn
     )
 
@@ -156,32 +184,17 @@ def register_to_wishlist(
 
 
 @router.get("/me/books", response_model=List[BookOut])
-def get_my_books(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return crud_book.get_books_by_user_id_and_status(
-        db=db,
-        user_id=current_user.id,
-        status=BookStatusEnum.OWNED
-    )
+def get_my_books(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return crud_book.get_books_by_user_id_and_status(db, current_user.id, BookStatusEnum.OWNED)
 
 
 @router.get("/me/wishlist", response_model=List[BookOut])
-def get_my_wishlist(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return crud_book.get_books_by_user_id_and_status(
-        db, user_id=current_user.id, status=BookStatusEnum.WISHLIST
-    )
+def get_my_wishlist(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return crud_book.get_books_by_user_id_and_status(db, current_user.id, BookStatusEnum.WISHLIST)
 
 
 @router.get("/me/books/favorites", response_model=List[BookOut])
-def get_favorite_books(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def get_favorite_books(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return crud_book.get_favorite_books_by_user_id(db, current_user.id)
 
 
@@ -191,20 +204,12 @@ def search_book(title: str):
 
 
 @router.get("/books/search_rakuten")
-def search_books_rakuten(
-    title: str = Query(..., description="検索タイトル"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def search_books_rakuten(title: str = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return search_books_by_title_rakuten(title)
 
 
 @router.get("/books/{book_id}", response_model=BookOut)
-def read_book(
-    book_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def read_book(book_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     book = crud_book.get_book_by_id(db, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -221,36 +226,107 @@ def fetch_book(isbn: str):
     raise HTTPException(status_code=404, detail="本が見つかりませんでした")
 
 
-@router.put("/books/{book_id}", response_model=BookOut)
-def update_my_book(
-    book_id: int,
-    update_data: BookUpdate,
+@router.put("/books/isbn/{isbn}", response_model=BookOut)
+def update_book_by_isbn(isbn: str, update_data: BookUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    book = db.query(Book).filter(Book.isbn == isbn, Book.user_id == current_user.id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="指定されたISBNの本が見つかりません。")
+    return crud_book.update_book(db=db, book_id=book.id, update_data=update_data, user_id=current_user.id)
+
+
+@router.patch("/books/isbn/{isbn}", response_model=BookOut)
+def patch_book_by_isbn(isbn: str, update_data: BookUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    book = db.query(Book).filter(Book.isbn == isbn, Book.user_id == current_user.id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="指定されたISBNの本が見つかりません。")
+    return crud_book.update_book(db=db, book_id=book.id, update_data=update_data, user_id=current_user.id)
+
+
+@router.delete("/books/isbn/{isbn}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_book_by_isbn(isbn: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    book = db.query(Book).filter(Book.isbn == isbn, Book.user_id == current_user.id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="本が見つかりませんでした")
+    db.delete(book)
+    db.commit()
+
+
+# ✅ PATCH: お気に入りトグル（ISBN指定）
+@router.patch("/books/favorite/isbn/{isbn}", response_model=BookOut)
+def toggle_favorite_by_isbn(
+    isbn: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    book = db.query(Book).filter(
+        Book.isbn == isbn,
+        Book.user_id == current_user.id
+    ).first()
+
+    if not book:
+        raise HTTPException(status_code=404, detail="本が見つかりませんでした")
+    if book.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="この書籍にはアクセスできません")
+    if book.status == BookStatusEnum.NOT_OWNED:
+        raise HTTPException(status_code=400, detail="所持もウィッシュリストにも追加されていません")
+
+    # ✅ is_favorite をトグル（反転）
+    book.is_favorite = not book.is_favorite
+    db.commit()
+    db.refresh(book)
+    return book
+
+
+# ✅ PATCH: お気に入りトグル（book_id指定）
+@router.patch("/books/favorite/{book_id}", response_model=BookOut)
+def toggle_favorite_by_book_id(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    book = db.query(Book).filter(
+        Book.id == book_id,
+        Book.user_id == current_user.id
+    ).first()
+
+    if not book:
+        raise HTTPException(status_code=404, detail="本が見つかりませんでした")
+    if book.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="この書籍にはアクセスできません")
+    if book.status == BookStatusEnum.NOT_OWNED:
+        raise HTTPException(status_code=400, detail="所持もウィッシュリストにも追加されていません")
+
+    # ✅ is_favorite をトグル
+    book.is_favorite = not book.is_favorite
+    db.commit()
+    db.refresh(book)
+    return book
+
+
+@router.put("/books/{book_id}", response_model=BookOut)
+def update_my_book(book_id: int, update_data: BookUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
 
 @router.patch("/books/{book_id}", response_model=BookOut)
-def patch_book(
-    book_id: int,
-    update_data: BookUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def patch_book(book_id: int, update_data: BookUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return crud_book.update_book(db=db, book_id=book_id, update_data=update_data, user_id=current_user.id)
 
 
+@router.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_book(book_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    book = crud_book.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="本が見つかりませんでした")
+    if book.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="この書籍にはアクセスできません")
+    db.delete(book)
+    db.commit()
+
+
 @router.put("/books/{title}/wishlist", response_model=BookOut)
-def add_to_wishlist(
-    title: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def add_to_wishlist(title: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     updated_book = crud_book.update_book_status_to_wishlist(db, title, current_user.id)
     if not updated_book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="本が見つかりません。"
-        )
+        raise HTTPException(status_code=404, detail="本が見つかりません。")
     return updated_book
