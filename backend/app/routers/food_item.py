@@ -12,8 +12,102 @@ from app.services.recipe_chatgpt import \
 from app.services.validate_category import validate_food_category
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+import os
+import requests
+from dotenv import load_dotenv
+from urllib.parse import urlencode
 
 router = APIRouter(prefix="/api", tags=["food_items"])
+
+load_dotenv()  # 環境変数（.env）読み込み
+
+# 📦 共通関数（JANコードからJANCODE APIを呼び出して1件取得）
+def fetch_jancode_product(barcode: str) -> tuple[dict, str]:
+    app_id = os.getenv("JANCODE_API_KEY")
+    if not app_id:
+        raise HTTPException(status_code=500, detail="APIキー未設定")
+
+    url = "https://api.jancodelookup.com/"
+    params = {
+        "appId": app_id,
+        "query": barcode,
+        "hits": 1,
+        "page": 1,
+        "type": "code"
+    }
+    full_url = f"{url}?{urlencode(params)}"
+
+    try:
+        res = requests.get(url, params=params)
+        res.raise_for_status()
+        json_data = res.json()
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="外部API接続失敗")
+    except ValueError:
+        raise HTTPException(status_code=502, detail="APIレスポンスがJSONではありません")
+
+    result = json_data.get("result") or json_data.get("product")
+
+    if not result:
+        raise HTTPException(status_code=404, detail={
+            "message": "商品が見つかりません（API上）",
+            "requested_url": full_url,
+            "web_fallback_url": f"https://www.jancodelookup.com/code/{barcode}",
+            "raw_api_response": json_data  # デバッグ用に出力
+        })
+
+    return result[0], full_url
+
+
+# ✅ 1. GET /api/foods/lookup → 商品情報のプレビュー
+@router.get("/foods/lookup", summary="JANコードで商品情報を確認")
+def preview_food_info(
+    barcode: str = Query(..., min_length=8, max_length=13),
+    current_user: User = Depends(get_current_user),
+):
+    item, full_url = fetch_jancode_product(barcode)
+    details = item.get("ProductDetails", {})
+
+    # 数量の算出
+    try:
+        total_volume = int(details.get("内容量", "").replace("ml", "").replace("ML", "").strip())
+    except:
+        total_volume = None
+    try:
+        unit_volume = int(details.get("単品容量", "").replace("ml", "").strip())
+    except:
+        unit_volume = None
+    try:
+        quantity = int(details.get("単品（個装）入数", "").strip())
+    except:
+        quantity = None
+
+   #if not quantity and total_volume and unit_volume and unit_volume > 0:
+    quantity = total_volume / unit_volume
+
+    return {
+        "requested_url": full_url,
+        "code": item.get("codeNumber"),
+        "name": item.get("itemName"),
+        "brand": item.get("brandName"),
+        "maker": item.get("makerName"),
+        "image_url": item.get("itemImageUrl"),
+        "details": details,
+        "calculated_quantity": quantity or 1
+    }
+
+
+# ✅ 2. GET /api/foods/lookup_name → 商品名だけ取得
+@router.get("/foods/lookup_name", summary="JANコードから商品名だけ取得")
+def lookup_food_name(
+    barcode: str = Query(..., min_length=8, max_length=13)
+):
+    item, full_url = fetch_jancode_product(barcode)
+    return {
+        "item_name": item.get("itemName", "名称不明"),
+        "requested_url": full_url
+    }
+
 
 # ✅ POST /api/foods
 @router.post("/foods", response_model=FoodItemRead)
