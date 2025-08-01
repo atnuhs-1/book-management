@@ -42,7 +42,6 @@ export const FoodPage = () => {
     fetchFoods();
   }, [token]);
 
-  // ステータス判定
   const getStatus = (dateStr: string) => {
     const today = new Date();
     const expiry = new Date(dateStr);
@@ -141,7 +140,7 @@ export const FoodPage = () => {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <h1 className="text-4xl font-light text-gray-800">食品一覧</h1>
         <GlassInput
-          placeholder="食品名・カテゴリで検索..."
+          placeholder="食品名を検索..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           icon="🔍"
@@ -149,20 +148,6 @@ export const FoodPage = () => {
         />
       </div>
 
-      {/* ✅ モバイル用：カテゴリモーダル起動ボタン */}
-      <div className="sm:hidden">
-        <button
-          onClick={() => setShowModal(true)}
-          className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white/30 backdrop-blur shadow flex items-center justify-between text-sm text-gray-700"
-        >
-          <span>
-            {currentCategory?.icon} {currentCategory?.name}
-          </span>
-          <span className="text-xs text-gray-500">カテゴリ変更 ⬇️</span>
-        </button>
-      </div>
-
-      {/* ✅ PC用：カテゴリボタン */}
       <div className="hidden sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-4">
         {foodCategories.map((category) => (
           <button
@@ -175,50 +160,11 @@ export const FoodPage = () => {
             }`}
           >
             <div className="text-2xl mb-2">{category.icon}</div>
-            <div className="text-xs font-medium text-gray-700">
-              {category.name}
-            </div>
+            <div className="text-xs font-medium text-gray-700">{category.name}</div>
           </button>
         ))}
       </div>
 
-      {/* ✅ モーダル */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-lg font-medium text-gray-800 mb-2 text-center">
-              カテゴリを選択
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              {foodCategories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => {
-                    setSelectedCategory(category.id);
-                    setShowModal(false);
-                  }}
-                  className={`p-3 border rounded-xl text-center text-sm transition ${
-                    selectedCategory === category.id
-                      ? "bg-indigo-100 border-indigo-300 text-indigo-700"
-                      : "bg-white hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="text-xl mb-1">{category.icon}</div>
-                  <div>{category.name}</div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowModal(false)}
-              className="block w-full mt-4 text-sm text-gray-500 hover:text-gray-700 text-center"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ 一覧表示 */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item: any) => (
           <GlassCard key={item.id} className="p-6">
@@ -240,15 +186,11 @@ export const FoodPage = () => {
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex justify-between">
                 <span>数量</span>
-                <span className="text-gray-800 font-medium">
-                  {item.quantity}
-                </span>
+                <span className="text-gray-800 font-medium">{item.quantity}</span>
               </div>
               <div className="flex justify-between">
                 <span>期限</span>
-                <span className="text-gray-800 font-medium">
-                  {item.expiration_date}
-                </span>
+                <span className="text-gray-800 font-medium">{item.expiration_date}</span>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
