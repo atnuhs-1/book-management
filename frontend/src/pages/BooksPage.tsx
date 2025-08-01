@@ -139,7 +139,7 @@ export const BooksPage = () => {
       {/* ヘッダー */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <h1 className="text-4xl font-light text-gray-800">📚 書籍一覧</h1>
+          <h1 className="text-4xl font-light text-gray-800">書籍一覧</h1>
           <div className="flex gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
               <GlassInput

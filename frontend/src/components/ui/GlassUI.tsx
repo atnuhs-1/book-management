@@ -34,7 +34,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       {children}
     </div>
   );
-};  
+};
 
 interface GlassInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -137,7 +137,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
 // ✅ グラス入力フィールドコンポーネント
 interface GlassInputProps {
-  label?: string; 
+  label?: string;
   type?: string;
   placeholder?: string;
   value: string;
@@ -169,7 +169,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
 
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 z-10">
             {icon}
           </div>
         )}
