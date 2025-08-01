@@ -59,14 +59,10 @@ export const FoodPage = () => {
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const currentCategory = foodCategories.find(
-    (cat) => cat.id === selectedCategory
-  );
-
   const handleDelete = async (id: number) => {
     const confirmDelete = window.confirm("この食品を削除しますか？");
     if (!confirmDelete) return;
-  
+
     try {
       const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
         method: "DELETE",
@@ -74,10 +70,9 @@ export const FoodPage = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (!res.ok) throw new Error("削除に失敗しました");
-  
-      // 成功したら一覧から削除
+
       setFoodItems((prev) => prev.filter((item: any) => item.id !== id));
     } catch (err) {
       console.error(err);
@@ -86,7 +81,6 @@ export const FoodPage = () => {
   };
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
-
   const [editForm, setEditForm] = useState({
     name: "",
     category: "",
@@ -106,7 +100,7 @@ export const FoodPage = () => {
 
   const handleUpdate = async () => {
     if (!editingItem) return;
-  
+
     try {
       const res = await fetch(`http://localhost:8000/api/foods/${editingItem.id}`, {
         method: "PUT",
@@ -121,14 +115,14 @@ export const FoodPage = () => {
           expiration_date: editForm.expiration_date,
         }),
       });
-  
+
       if (!res.ok) throw new Error("更新に失敗しました");
-  
+
       const updated = await res.json();
       setFoodItems((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
-      setEditingItem(null); // モーダルを閉じる
+      setEditingItem(null);
     } catch (err) {
       console.error(err);
       alert("更新に失敗しました");
@@ -196,103 +190,93 @@ export const FoodPage = () => {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => handleEdit(item)}
-                className="text-sm text-blue-600 hover:underline"
+                className="px-3 py-1 text-sm rounded text-white bg-blue-500 hover:bg-blue-600 transition"
               >
-                ✏️ 編集
+                編集
               </button>
               <button
                 onClick={() => handleDelete(item.id)}
-                className="text-sm text-red-600 hover:underline"
+                className="px-3 py-1 text-sm rounded text-white bg-red-500 hover:bg-red-600 transition"
               >
-                🗑️ 削除
+                削除
               </button>
-              </div>
+            </div>
           </GlassCard>
         ))}
       </div>
 
-          {editingItem && (
-      <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6 space-y-4">
-          <h2 className="text-lg font-medium text-gray-800 text-center">食品を編集</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleUpdate();
-            }}
-            className="space-y-4"
-          >
-            <input
-              type="text"
-              className="w-full border px-3 py-2 rounded"
-              placeholder="商品名"
-              value={editForm.name}
-              onChange={(e) =>
-                setEditForm((prev) => ({ ...prev, name: e.target.value }))
-              }
-              required
-            />
-            <input
-              type="text"
-              className="w-full border px-3 py-2 rounded"
-              placeholder="カテゴリ"
-              value={editForm.category}
-              onChange={(e) =>
-                setEditForm((prev) => ({ ...prev, category: e.target.value }))
-              }
-              required
-            />
-            <input
-              type="number"
-              className="w-full border px-3 py-2 rounded"
-              placeholder="数量"
-              value={editForm.quantity}
-              min={1}
-              onChange={(e) =>
-                setEditForm((prev) => ({ ...prev, quantity: e.target.value }))
-              }
-              required
-            />
-            <input
-              type="date"
-              className="w-full border px-3 py-2 rounded"
-              value={editForm.expiration_date}
-              onChange={(e) =>
-                setEditForm((prev) => ({
-                  ...prev,
-                  expiration_date: e.target.value,
-                }))
-              }
-              required
-            />
-            <button
-              type="submit"
-              className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition"
-            >
-              保存
-            </button>
-          </form>
-          <div className="flex justify-center pt-2">
-            <button
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-              onClick={() => setEditingItem(null)}
-            >
-              キャンセル
-            </button>
-          </div>
-        </div>
-      </div>
-      )}
+      {editingItem && (
+  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
+      <h2 className="text-lg font-semibold text-gray-800">食品情報の編集</h2>
 
-      {filteredItems.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4 opacity-50">🍎</div>
-          <h3 className="text-xl font-light text-gray-800 mb-2">
-            食品が見つかりません
-          </h3>
-          <p className="text-gray-600">別の条件で検索してみてください</p>
-        </div>
-      )}
+      <div className="space-y-3">
+        <label className="block">
+          <span className="text-sm text-gray-600">食品名</span>
+          <input
+            type="text"
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            className="mt-1 w-full rounded border-gray-300 shadow-sm"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm text-gray-600">カテゴリ</span>
+          <select
+            value={editForm.category}
+            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+            className="mt-1 w-full rounded border-gray-300 shadow-sm"
+          >
+            {foodCategories
+              .filter((c) => c.id !== "all")
+              .map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm text-gray-600">数量</span>
+          <input
+            type="number"
+            value={editForm.quantity}
+            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+            className="mt-1 w-full rounded border-gray-300 shadow-sm"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm text-gray-600">賞味/消費期限</span>
+          <input
+            type="date"
+            value={editForm.expiration_date}
+            onChange={(e) => setEditForm({ ...editForm, expiration_date: e.target.value })}
+            className="mt-1 w-full rounded border-gray-300 shadow-sm"
+          />
+        </label>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <button
+          onClick={() => setEditingItem(null)}
+          className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
+        >
+          キャンセル
+        </button>
+        <button
+          onClick={handleUpdate}
+          className="px-4 py-2 text-sm rounded text-white bg-green-500 hover:bg-green-600"
+        >
+          保存
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
