@@ -9,6 +9,7 @@ from app.schemas.food_item import FoodItemCreate, FoodItemRead
 from app.services.hybrid_recipe import hybrid_recipe_suggestion
 from app.services.recipe_chatgpt import \
     generate_recipe_focused_on_main_ingredient
+from app.services.validate_category import validate_food_category
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,10 @@ def create_food(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # ChatGPT でカテゴリが妥当かを確認
+    if not validate_food_category(food.name, food.category.value):
+        raise HTTPException(status_code=400, detail=f"{food.name} は {food.category.value} に分類されません")
+
     return crud_food.create_food_item(db, current_user.id, food)
 
 # ✅ GET /api/me/foods
