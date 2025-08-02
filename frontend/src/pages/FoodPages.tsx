@@ -8,15 +8,21 @@ import { FOOD_UNITS } from "../types/food";
 
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️" },
-  { id: "FRESH", name: "生鮮食品", icon: "🥬" },
-  { id: "EMERGENCY", name: "非常食", icon: "🥢" },
-  { id: "BEVERAGES", name: "飲料", icon: "🥤" },
-  { id: "SEASONINGS", name: "調味料", icon: "🠂" },
-  { id: "FROZEN", name: "冷凍食品", icon: "🤊" },
-  { id: "SNACKS", name: "お菓子", icon: "🍪" },
+  { id: "野菜・きのこ類", name: "野菜・きのこ類", icon: "🥬" },
+  { id: "果物", name: "果物", icon: "🍎" },
+  { id: "精肉", name: "精肉", icon: "🥩" },
+  { id: "魚介類", name: "魚介類", icon: "🐟" },
+  { id: "卵・乳製品", name: "卵・乳製品", icon: "🥚" },
+  { id: "冷凍食品", name: "冷凍食品", icon: "🧊" },
+  { id: "レトルト・缶詰", name: "レトルト・缶詰", icon: "🥫" },
+  { id: "ハム・ソーセージ類", name: "ハム・ソーセージ類", icon: "🌭" },
+  { id: "惣菜", name: "惣菜", icon: "🍱" },
+  { id: "お菓子", name: "お菓子", icon: "🍪" },
+  { id: "米、パン、麺", name: "米、パン、麺", icon: "🍚" },
+  { id: "調味料", name: "調味料", icon: "🧂" },
+  { id: "飲料", name: "飲料", icon: "🥤" },
+  { id: "その他", name: "その他", icon: "📦" },
 ];
-
-const quantityUnits = ["g", "個"];
 
 export const FoodPage = () => {
   const { token } = useAuthStore();
@@ -33,7 +39,7 @@ export const FoodPage = () => {
   });
   const [forceEditConfirmVisible, setForceEditConfirmVisible] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState("");
-
+  
   useEffect(() => {
     const fetchFoods = async () => {
       try {
@@ -64,6 +70,46 @@ export const FoodPage = () => {
   };
 
   const currentCategoryObj = foodCategories.find((cat) => cat.id === selectedCategory);
+
+  const CategorySelector = ({ selectedCategory, setSelectedCategory }: { selectedCategory: string; setSelectedCategory: (value: string) => void }) => {
+    return (
+      <>
+        {/* モバイル用: ドロップダウン */}
+        <div className="sm:hidden">
+          <select
+            className="w-full p-2 rounded-lg border border-gray-300"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            {foodCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.icon} {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+  
+        {/* Web用: ボタンカテゴリ一覧 */}
+        <div className="hidden sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-4">
+          {foodCategories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`p-4 rounded-2xl text-center transition-all duration-500 border ${
+                selectedCategory === category.id
+                  ? "bg-white/50 backdrop-blur-xl border-white/40 shadow-xl"
+                  : "bg-white/20 backdrop-blur-xl border-white/20 hover:bg-white/30"
+              }`}
+            >
+              <div className="text-2xl mb-2">{category.icon}</div>
+              <div className="text-xs font-medium text-gray-700">{category.name}</div>
+            </button>
+          ))}
+        </div>
+      </>
+    );
+  };
+
 
   const filteredItems = foodItems.filter(
     (item) =>
@@ -162,23 +208,12 @@ export const FoodPage = () => {
         />
       </div>
 
-      <div className="hidden sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-4">
-        {foodCategories.map((category) => (
-          <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.id)}
-            className={`p-4 rounded-2xl text-center transition-all duration-500 border ${
-              selectedCategory === category.id
-                ? "bg-white/50 backdrop-blur-xl border-white/40 shadow-xl"
-                : "bg-white/20 backdrop-blur-xl border-white/20 hover:bg-white/30"
-            }`}
-          >
-            <div className="text-2xl mb-2">{category.icon}</div>
-            <div className="text-xs font-medium text-gray-700">{category.name}</div>
-          </button>
-        ))}
-      </div>
+      <CategorySelector
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+      />
 
+      
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item: any) => (
           <GlassCard key={item.id} className="p-6">

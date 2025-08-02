@@ -25,12 +25,20 @@ import {
 } from "../utils/foodUtils";
 
 const foodCategories = [
-  { id: "生鮮食品", name: "生鮮食品", icon: "🥬" },
-  { id: "非常食", name: "非常食", icon: "🥫" },
-  { id: "飲料", name: "飲料", icon: "🥤" },
-  { id: "調味料", name: "調味料", icon: "🧂" },
-  { id: "冷凍食品", name: "冷凍食品", icon: "🧊" },
-  { id: "お菓子", name: "お菓子", icon: "🍪" },
+  { id: "野菜・きのこ類", name: "野菜・きのこ類" },
+  { id: "果物", name: "果物" },
+  { id: "精肉", name: "精肉" },
+  { id: "魚介類", name: "魚介類" },
+  { id: "卵・乳製品", name: "卵・乳製品" },
+  { id: "冷凍食品", name: "冷凍食品" },
+  { id: "レトルト・缶詰", name: "レトルト・缶詰" },
+  { id: "ハム・ソーセージ類", name: "ハム・ソーセージ類" },
+  { id: "惣菜", name: "惣菜" },
+  { id: "お菓子", name: "お菓子" },
+  { id: "米、パン、麺", name: "米、パン、麺" },
+  { id: "調味料", name: "調味料" },
+  { id: "飲料", name: "飲料" },
+  { id: "その他", name: "その他" },
 ];
 
 // ✅ 新規追加: 食品単位の選択肢
@@ -365,22 +373,21 @@ export const RegisterFoodPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 カテゴリ
               </label>
-              <button
-                type="button"
-                onClick={() => setShowCategoryModal(true)}
+              <select
+                value={food.category || ""}
+                onChange={(e) => handleChange("category", e.target.value)}
                 disabled={isLoading}
-                className="w-full px-4 py-2 border rounded-lg text-left text-gray-800 bg-white/70 hover:bg-white/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 border rounded-lg text-gray-800 bg-white/70 hover:bg-white/80 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {selectedCategory ? (
-                  <span>
-                    {selectedCategory.icon} {selectedCategory.name}
-                  </span>
-                ) : (
-                  <span className="text-gray-400">
-                    カテゴリを選択してください
-                  </span>
-                )}
-              </button>
+                <option value="" disabled>
+                  カテゴリを選択してください
+                </option>
+                {foodCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
