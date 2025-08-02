@@ -51,3 +51,6 @@ class FoodItemRead(FoodItemBase):
 
     class Config:
         orm_mode = True
+
+class FoodUsageRequest(BaseModel):
+    used_quantity: int
