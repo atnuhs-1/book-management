@@ -59,8 +59,6 @@ def update_user_info(
         user.username = update.username
     if update.email:
         user.email = update.email
-    if update.full_name:
-        user.full_name = update.full_name
 
     db.commit()
     db.refresh(user)
@@ -71,7 +69,6 @@ def update_user_info(
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "full_name": user.full_name,
         },
     }
 

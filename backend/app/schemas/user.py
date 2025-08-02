@@ -31,7 +31,6 @@ class TokenWithUser(BaseModel):
 class UpdateUserRequest(BaseModel):
     username: Optional[str]
     email: Optional[EmailStr]
-    full_name: Optional[str]
 
 
 class ChangePasswordRequest(BaseModel):
