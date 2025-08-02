@@ -39,10 +39,11 @@ class BookUpdate(BaseModel):
     genres: Optional[List[str]] = None
     isbn13: Optional[str] = None  # ← ISBN形式統一用の補助欄なら任意で
 
-# ✅ レスポンス用（IDとuser_id付き）
+# schemas/book.py
 class BookOut(BookBase):
     id: int
     user_id: int
+    amazon_url: Optional[str] = None  # ✅ 追加
 
     class Config:
         orm_mode = True
