@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
-
+import { useNavigate } from "react-router-dom";
 
 export const SettingsPage = () => {
   const { theme, toggleTheme } = useThemeStore();
-  const token = useAuthStore((state) => state.token);
+  const { token, logout } = useAuthStore(); // ✅ logout を取得
+  const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -17,9 +18,9 @@ export const SettingsPage = () => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
 
   const API_BASE = "http://localhost:8000";
 
@@ -44,7 +45,9 @@ export const SettingsPage = () => {
         { username, email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert("ユーザー情報を更新しました！");
+      alert("ユーザー情報を更新しました。再ログインしてください。");
+      logout(); // ✅ トークン削除
+      navigate("/login"); // ✅ ログイン画面へ遷移
     } catch (err) {
       console.error(err);
       alert("ユーザー情報の更新に失敗しました。");
@@ -175,40 +178,39 @@ export const SettingsPage = () => {
               </div>
             </div>
 
-    {/* 新しいパスワード */}
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        新しいパスワード
-      </label>
-      <div className="relative">
-        <input
-          type={showNewPassword ? "text" : "password"}
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          minLength={6}
-          className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm pr-10"
-        />
-        <button
-          type="button"
-          onClick={() => setShowNewPassword((prev) => !prev)}
-          className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-gray-500"
-        >
-          {showNewPassword ? "🙈" : "👁"}
-        </button>
-      </div>
-    </div>
+            {/* 新しいパスワード */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                新しいパスワード
+              </label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-gray-500"
+                >
+                  {showNewPassword ? "🙈" : "👁"}
+                </button>
+              </div>
+            </div>
 
-    <button
-      type="submit"
-      disabled={changingPassword}
-      className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
-    >
-      {changingPassword ? "変更中..." : "パスワードを変更する"}
-    </button>
-  </form>
-</div>
-
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {changingPassword ? "変更中..." : "パスワードを変更する"}
+            </button>
+          </form>
+        </div>
 
         {/* 表示設定 */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
