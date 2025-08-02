@@ -203,9 +203,6 @@ export const AddBookPage = () => {
     <div className="max-w-4xl mx-auto space-y-8">
       {/* ヘッダー */}
       <div className="text-center">
-        <h1 className="text-4xl font-light text-gray-800 mb-4">
-          📚 書籍を追加
-        </h1>
         <p className="text-gray-600 text-lg">
           書籍を追加する方法を選択してください
         </p>

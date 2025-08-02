@@ -1,4 +1,4 @@
-// src/stores/bookStore.ts - ウィッシュリスト機能追加版
+// src/stores/bookStore.ts - ウィッシュリスト取得機能追加版
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -9,6 +9,7 @@ import type {
   BookUpdate,
   GoogleBookInfo,
 } from "../types/book";
+import { formatBookError, formatErrorMessage, logError } from "../utils/errorFormatter";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -20,16 +21,24 @@ interface BookStore {
   searchResults: GoogleBookInfo[];
   isSearching: boolean;
   selectedBook: Book | null;
+
   // ✅ 既存: バーコード関連の状態
   isRegisteringByISBN: boolean;
   lastScannedISBN: string | null;
+
   // ✅ 既存: タイトル検索登録の状態
   isRegisteringByTitle: boolean;
   titleSearchResults: GoogleBookInfo[];
   isTitleSearching: boolean;
-  // ✅ 新規追加: ウィッシュリスト関連の状態
+
+  // ✅ 既存: ウィッシュリスト登録関連の状態
   isRegisteringToWishlist: boolean;
   wishlistError: string | null;
+
+  // ✅ 新規追加: ウィッシュリスト取得関連の状態
+  wishlistBooks: Book[];
+  isLoadingWishlist: boolean;
+  wishlistFetchError: string | null;
 
   // ✅ 既存: 認証関連エラーの状態
   lastAuthError: string | null;
@@ -64,10 +73,17 @@ interface BookStore {
   ) => Promise<GoogleBookInfo[]>;
   createBookByTitle: (title: string) => Promise<Book>;
 
-  // ✅ 新規追加: ウィッシュリスト関連のアクション
+  // ✅ 既存: ウィッシュリスト登録関連のアクション
   setRegisteringToWishlist: (registering: boolean) => void;
   setWishlistError: (error: string | null) => void;
   addToWishlist: (bookData: any) => Promise<Book>;
+
+  // ✅ 新規追加: ウィッシュリスト取得関連のアクション
+  setWishlistBooks: (books: Book[]) => void;
+  setLoadingWishlist: (loading: boolean) => void;
+  setWishlistFetchError: (error: string | null) => void;
+  fetchWishlist: () => Promise<void>;
+  clearWishlist: () => void;
 
   // ✅ 既存: 認証エラー管理
   setAuthError: (error: string | null) => void;
@@ -83,127 +99,6 @@ interface BookStore {
   searchBooksByTitle: (title: string) => Promise<GoogleBookInfo[]>;
 }
 
-// ✅ 改良版: エラーメッセージの詳細な判定
-const formatErrorMessage = (
-  error: any
-): { message: string; isAuthError: boolean } => {
-  if (typeof error === "string") {
-    return { message: error, isAuthError: false };
-  }
-
-  // ネットワークエラー
-  if (!error.response) {
-    return {
-      message:
-        "ネットワークエラーが発生しました。インターネット接続を確認してください。",
-      isAuthError: false,
-    };
-  }
-
-  const { status, data } = error.response;
-
-  // HTTPステータスコード別の詳細メッセージ
-  switch (status) {
-    case 401:
-      const detail = data?.detail || "";
-
-      // ✅ バックエンドからの期限切れメッセージを検出
-      if (
-        detail.includes("有効期限が切れました") ||
-        detail.includes("expired")
-      ) {
-        return {
-          message:
-            "セッションの有効期限が切れました。再度ログインしてください。",
-          isAuthError: true,
-        };
-      }
-
-      if (
-        detail.includes("認証情報が無効です") ||
-        detail.includes("トークンが無効です")
-      ) {
-        return {
-          message: "認証情報が無効です。ログインし直してください。",
-          isAuthError: true,
-        };
-      }
-
-      if (detail.includes("ユーザーが見つかりません")) {
-        return {
-          message: "ユーザー情報が見つかりません。再度ログインしてください。",
-          isAuthError: true,
-        };
-      }
-
-      return {
-        message: detail || "認証に失敗しました。ログインしてください。",
-        isAuthError: true,
-      };
-
-    case 400:
-      // ✅ ウィッシュリスト固有のエラーメッセージ
-      if (data?.detail) {
-        return { message: data.detail, isAuthError: false };
-      }
-      return {
-        message: "リクエストに問題があります。",
-        isAuthError: false,
-      };
-
-    case 403:
-      return {
-        message: "この操作を行う権限がありません。",
-        isAuthError: false,
-      };
-
-    case 404:
-      return {
-        message: "書籍が見つかりません。削除された可能性があります。",
-        isAuthError: false,
-      };
-
-    case 422:
-      // FastAPIのバリデーションエラー
-      if (Array.isArray(data?.detail)) {
-        const validationErrors = data.detail
-          .map((e: any) => {
-            const field = e.loc?.join(".");
-            const message = e.msg;
-            return `${field}: ${message}`;
-          })
-          .join(", ");
-        return {
-          message: `入力エラー: ${validationErrors}`,
-          isAuthError: false,
-        };
-      }
-      return {
-        message: "入力データに問題があります。",
-        isAuthError: false,
-      };
-
-    case 500:
-      return {
-        message:
-          "サーバーエラーが発生しました。しばらく待ってから再試行してください。",
-        isAuthError: false,
-      };
-
-    default:
-      // カスタムメッセージがある場合
-      if (data?.detail) {
-        if (typeof data.detail === "string") {
-          return { message: data.detail, isAuthError: false };
-        }
-      }
-      return {
-        message: `エラーが発生しました (${status})`,
-        isAuthError: false,
-      };
-  }
-};
-
 export const useBookStore = create<BookStore>()(
   devtools((set, get) => ({
     books: [],
@@ -215,16 +110,24 @@ export const useBookStore = create<BookStore>()(
     selectedBook: null,
     lastAuthError: null,
     hasAuthError: false,
+
     // ✅ 既存: バーコード関連の初期状態
     isRegisteringByISBN: false,
     lastScannedISBN: null,
+
     // ✅ 既存: タイトル検索登録の初期状態
     isRegisteringByTitle: false,
     titleSearchResults: [],
     isTitleSearching: false,
-    // ✅ 新規追加: ウィッシュリスト関連の初期状態
+
+    // ✅ 既存: ウィッシュリスト登録関連の初期状態
     isRegisteringToWishlist: false,
     wishlistError: null,
+
+    // ✅ 新規追加: ウィッシュリスト取得関連の初期状態
+    wishlistBooks: [],
+    isLoadingWishlist: false,
+    wishlistFetchError: null,
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
@@ -232,6 +135,10 @@ export const useBookStore = create<BookStore>()(
     updateBook: (updatedBook) =>
       set((state) => ({
         books: state.books.map((book) =>
+          book.id === updatedBook.id ? updatedBook : book
+        ),
+        // ✅ ウィッシュリストも同時更新
+        wishlistBooks: state.wishlistBooks.map((book) =>
           book.id === updatedBook.id ? updatedBook : book
         ),
       })),
@@ -266,18 +173,72 @@ export const useBookStore = create<BookStore>()(
 
     clearTitleSearchResults: () => set({ titleSearchResults: [] }),
 
-    // ✅ 新規追加: ウィッシュリスト関連のアクション
+    // ✅ 既存: ウィッシュリスト登録関連のアクション
     setRegisteringToWishlist: (registering) =>
       set({ isRegisteringToWishlist: registering }),
 
     setWishlistError: (error) => set({ wishlistError: error }),
+
+    // ✅ 新規追加: ウィッシュリスト取得関連のアクション
+    setWishlistBooks: (books) => set({ wishlistBooks: books }),
+
+    setLoadingWishlist: (loading) => set({ isLoadingWishlist: loading }),
+
+    setWishlistFetchError: (error) => set({ wishlistFetchError: error }),
+
+    clearWishlist: () =>
+      set({
+        wishlistBooks: [],
+        wishlistFetchError: null,
+      }),
 
     // ✅ 既存: 認証エラー管理
     setAuthError: (error) =>
       set({ lastAuthError: error, hasAuthError: !!error }),
     clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
 
-    // ✅ 新機能: ウィッシュリストに追加
+    // ✅ 新機能: ウィッシュリスト取得
+    fetchWishlist: async () => {
+      set({
+        isLoadingWishlist: true,
+        wishlistFetchError: null,
+      });
+
+      try {
+        const response = await axios.get(`${API_BASE_URL}/me/wishlist`);
+
+        // ✅ バックエンドから返されるBookOut[]をBook[]として扱う
+        // amazon_urlフィールドが追加されている可能性があるが、Book型は柔軟に対応
+        const wishlistBooks = response.data;
+
+        set({
+          wishlistBooks,
+          isLoadingWishlist: false,
+        });
+
+        get().clearAuthError();
+      } catch (error: unknown) {
+        console.error("❌ ウィッシュリスト取得エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "fetchWishlist");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
+          set({
+            isLoadingWishlist: false,
+            wishlistBooks: [], // 認証エラー時はクリア
+          });
+        } else {
+          set({
+            wishlistFetchError: errorResult.message,
+            isLoadingWishlist: false,
+          });
+        }
+      }
+    },
+
+    // ✅ 既存機能: ウィッシュリストに追加
     addToWishlist: async (bookData: any) => {
       set({ isRegisteringToWishlist: true, wishlistError: null });
 
@@ -296,21 +257,29 @@ export const useBookStore = create<BookStore>()(
 
         set((state) => ({
           books: [...state.books, registeredBook],
+          // ✅ ウィッシュリストにも追加
+          wishlistBooks: [...state.wishlistBooks, registeredBook],
           isRegisteringToWishlist: false,
         }));
 
         get().clearAuthError();
         return registeredBook;
-      } catch (err: any) {
-        console.error("❌ ウィッシュリスト追加エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("❌ ウィッシュリスト追加エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "addToWishlist");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isRegisteringToWishlist: false });
           throw new Error("認証が必要です。再度ログインしてください。");
         } else {
-          set({ wishlistError: message, isRegisteringToWishlist: false });
-          throw new Error(message);
+          set({
+            wishlistError: errorResult.message,
+            isRegisteringToWishlist: false,
+          });
+          throw new Error(errorResult.message);
         }
       }
     },
@@ -318,18 +287,22 @@ export const useBookStore = create<BookStore>()(
     // ✅ 既存の関数（変更なし）
     fetchBooks: async () => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.get(`${API_BASE_URL}/me/books`);
         set({ books: response.data, isLoading: false });
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("書籍取得エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("書籍取得エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "fetchBooks");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
         } else {
-          set({ error: message, isLoading: false, books: [] });
+          set({ error: errorResult.message, isLoading: false, books: [] });
         }
       }
     },
@@ -341,14 +314,17 @@ export const useBookStore = create<BookStore>()(
         set({ isLoading: false });
         get().clearAuthError();
         return response.data;
-      } catch (err: any) {
-        console.error("書籍詳細取得エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("書籍詳細取得エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "fetchBookById");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
         } else {
-          set({ error: message, isLoading: false });
+          set({ error: errorResult.message, isLoading: false });
         }
         return null;
       }
@@ -356,23 +332,29 @@ export const useBookStore = create<BookStore>()(
 
     createBook: async (bookData) => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.post(`${API_BASE_URL}/books`, bookData);
+
         set((state) => ({
           books: [...state.books, response.data],
           isLoading: false,
         }));
+
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("書籍作成エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("書籍作成エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "createBook");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
-          set({ error: message, isLoading: false });
-          throw new Error(message);
+          set({ error: errorResult.message, isLoading: false });
+          throw new Error(errorResult.message);
         }
       }
     },
@@ -400,16 +382,19 @@ export const useBookStore = create<BookStore>()(
 
         get().clearAuthError();
         return registeredBook;
-      } catch (err: any) {
-        console.error("❌ ISBN書籍登録エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("❌ ISBN書籍登録エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "createBookByISBN");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isRegisteringByISBN: false });
           throw new Error("認証が必要です。再度ログインしてください。");
         } else {
-          set({ error: message, isRegisteringByISBN: false });
-          throw new Error(message);
+          set({ error: errorResult.message, isRegisteringByISBN: false });
+          throw new Error(errorResult.message);
         }
       }
     },
@@ -417,6 +402,7 @@ export const useBookStore = create<BookStore>()(
     // ✅ 既存機能: タイトル検索（登録用）
     searchBooksByTitleForRegistration: async (title: string) => {
       set({ isTitleSearching: true, error: null });
+
       try {
         const response = await axios.get(`${API_BASE_URL}/search_book`, {
           params: { title },
@@ -427,11 +413,14 @@ export const useBookStore = create<BookStore>()(
           isTitleSearching: false,
         });
         return results;
-      } catch (err: any) {
-        const { message } = formatErrorMessage(err);
-        console.error("書籍検索エラー:", err);
+      } catch (error: unknown) {
+        console.error("書籍検索エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "searchBooksByTitleForRegistration");
+
         set({
-          error: message,
+          error: errorResult.message,
           isTitleSearching: false,
           titleSearchResults: [],
         });
@@ -464,22 +453,26 @@ export const useBookStore = create<BookStore>()(
 
         get().clearAuthError();
         return registeredBook;
-      } catch (err: any) {
-        console.error("❌ タイトル書籍登録エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("❌ タイトル書籍登録エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "createBookByTitle");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isRegisteringByTitle: false });
           throw new Error("認証が必要です。再度ログインしてください。");
         } else {
-          set({ error: message, isRegisteringByTitle: false });
-          throw new Error(message);
+          set({ error: errorResult.message, isRegisteringByTitle: false });
+          throw new Error(errorResult.message);
         }
       }
     },
 
     updateBookById: async (id: number, updateData: BookUpdate) => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.put(
           `${API_BASE_URL}/books/${id}`,
@@ -489,16 +482,19 @@ export const useBookStore = create<BookStore>()(
         updateBook(response.data);
         set({ isLoading: false });
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("書籍更新エラー:", err);
-        const { message, isAuthError } = formatErrorMessage(err);
-        if (isAuthError) {
-          get().setAuthError(message);
+      } catch (error: unknown) {
+        console.error("書籍更新エラー:", error);
+
+        const errorResult = formatBookError(error);
+        logError(error, "updateBookById");
+
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
-          set({ error: message, isLoading: false });
-          throw new Error(message);
+          set({ error: errorResult.message, isLoading: false });
+          throw new Error(errorResult.message);
         }
       }
     },
@@ -508,27 +504,35 @@ export const useBookStore = create<BookStore>()(
       try {
         const response = await axios.get(`${API_BASE_URL}/fetch_book/${isbn}`);
         return response.data;
-      } catch (err: any) {
-        const { message } = formatErrorMessage(err);
-        console.error("ISBN検索エラー:", err);
-        set({ error: message });
+      } catch (error: unknown) {
+        console.error("ISBN検索エラー:", error);
+
+        const errorResult = formatErrorMessage(error);
+        logError(error, "fetchBookByISBN");
+
+        set({ error: errorResult.message });
         return null;
       }
     },
 
     searchBooksByTitle: async (title: string) => {
       set({ isSearching: true, error: null });
+
       try {
         const response = await axios.get(`${API_BASE_URL}/search_book`, {
           params: { title },
         });
         set({ searchResults: response.data, isSearching: false });
         return response.data;
-      } catch (err: any) {
-        const { message } = formatErrorMessage(err);
-        console.error("書籍検索エラー:", err);
+      } catch (error: unknown) {
+        console.error("書籍検索エラー:", error);
+
+        // ✅ 外部APIなので汎用エラーフォーマッターを使用
+        const errorResult = formatErrorMessage(error);
+        logError(error, "searchBooksByTitle");
+
         set({
-          error: message,
+          error: errorResult.message,
           isSearching: false,
           searchResults: [],
         });
