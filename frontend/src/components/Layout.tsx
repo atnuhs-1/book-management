@@ -447,7 +447,7 @@ export const Layout = ({ children }: LayoutProps) => {
       )}
 
       {/* モバイルナビゲーション - 認証状態に応じて動的変更 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-t border-white/20 dark:border-gray-700 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-t border-white/20 dark:border-gray-700 z-49">
         <div className="grid grid-cols-4 gap-2 p-4">
           {mobileNavigationItems.map((item) => (
             <GlassMobileTab

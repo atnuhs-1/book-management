@@ -209,31 +209,21 @@ export const BarcodeScanPage = () => {
   return (
     <div className="max-w-4xl mx-auto">
       {/* ✅ ヘッダー */}
-      <div className="text-center">
-        <h1 className="text-3xl font-light text-gray-800 mb-4">{getTitle()}</h1>
-        <p className="text-gray-600 text-lg">{getSubtitle()}</p>
 
-        {/* モード表示 */}
-        <div className="mt-4 inline-flex items-center px-4 py-2 bg-blue-50/50 backdrop-blur-sm rounded-xl border border-blue-200/30">
-          <span className="text-sm text-blue-800">
-            <span className="font-medium">モード:</span>{" "}
-            {mode === "book" ? "📚 書籍" : "🍎 食品"} |{" "}
-            <span className="font-medium">動作:</span>{" "}
-            {action === "register" ? "登録" : "検索"}
-          </span>
-        </div>
-      </div>
 
       {/* ✅ エラー表示 */}
       {(scanError || bookError) && (
-        <GlassError
-          message={scanError || bookError || "エラーが発生しました"}
-          onRetry={() => {
-            setScanError(null);
-            setIsProcessing(false);
-            setLastScannedCode(null);
-          }}
-        />
+        <div>
+          <GlassError
+            className="hidden md:block"
+            message={scanError || bookError || "エラーが発生しました"}
+            onRetry={() => {
+              setScanError(null);
+              setIsProcessing(false);
+              setLastScannedCode(null);
+            }}
+          />
+        </div>
       )}
 
       {/* ✅ バーコードスキャナー */}
@@ -243,10 +233,11 @@ export const BarcodeScanPage = () => {
         onClose={handleClose}
         title={getTitle()}
         subtitle={getSubtitle()}
+        manualStart={true}
       />
 
       {/* ✅ 操作ガイド */}
-      <GlassCard className="p-8 mt-8">
+      <GlassCard className="p-8 mt-8 hidden md:block">
         <h3 className="text-2xl font-light text-gray-800 mb-6 flex items-center">
           <span className="mr-3">💡</span>
           使い方
