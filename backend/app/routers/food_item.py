@@ -239,3 +239,25 @@ def delete_food(
     current_user: User = Depends(get_current_user)
 ):
     return crud_food.delete_food_item(db, food_id, current_user.id)
+
+@router.post("/foods/from_barcode_auto", summary="JANコードから食品登録（自動数量・単位）")
+def register_food_auto(
+    barcode: str = Query(..., min_length=8, max_length=13),
+    category: FoodCategory = Query(..., description="カテゴリを明示的に指定（例: 飲料）"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    item, _ = fetch_jancode_product(barcode)
+    from app.crud.food_item import extract_quantity_and_unit
+
+    quantity, unit = extract_quantity_and_unit(item.get("ProductDetails", {}))
+
+    food = FoodItemCreate(
+        name=item.get("itemName", "名称不明"),
+        category=category,  # ✅ フロントから指定されたカテゴリ
+        quantity=quantity,
+        unit=unit,
+        expiration_date=date.today() + timedelta(days=30)
+    )
+
+    return crud_food.create_food_item(db, current_user.id, food)
