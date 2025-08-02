@@ -7,6 +7,8 @@ interface ApiErrorResponse {
   detail: string | Array<{ msg: string; type: string }>;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export const ForgotPasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      await axios.post("http://localhost:8000/api/auth/request-password-reset", {
+      await axios.post(`${API_BASE_URL}/auth/request-password-reset`, {
         email,
       });
       setMessage("パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。");

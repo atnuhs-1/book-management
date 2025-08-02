@@ -10,6 +10,8 @@ interface ApiErrorResponse {
   detail: string | Array<{ msg: string; type: string }>;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export const SettingsPage = () => {
   const { theme, toggleTheme } = useThemeStore();
   const { token, logout } = useAuthStore();
@@ -28,11 +30,9 @@ export const SettingsPage = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  const API_BASE = "http://localhost:8000";
-
   useEffect(() => {
     axios
-      .get(`${API_BASE}/api/auth/me`, {
+      .get(`${API_BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -56,7 +56,7 @@ export const SettingsPage = () => {
 
     try {
       await axios.put(
-        `${API_BASE}/api/auth/users/me`,
+        `${API_BASE_URL}/auth/users/me`,
         { username, email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -85,7 +85,7 @@ export const SettingsPage = () => {
     setChangingPassword(true);
     try {
       await axios.put(
-        `${API_BASE}/api/auth/users/me/password`,
+        `${API_BASE_URL}/auth/users/me/password`,
         {
           current_password: currentPassword,
           new_password: newPassword,

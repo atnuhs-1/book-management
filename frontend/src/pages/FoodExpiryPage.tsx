@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { GlassCard } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 type FoodItem = {
   id: number;
   name: string;
@@ -22,7 +24,7 @@ export const FoodExpiryPage = () => {
   useEffect(() => {
     const fetchFoods = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/me/foods/", {
+        const res = await fetch(`${API_BASE_URL}/me/foods/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -65,7 +67,7 @@ export const FoodExpiryPage = () => {
 
   const handleEat = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/foods/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

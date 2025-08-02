@@ -8,6 +8,8 @@ interface ApiErrorResponse {
   detail: string | Array<{ msg: string; type: string }>;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
@@ -25,7 +27,7 @@ export const ResetPasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      await axios.post("http://localhost:8000/api/auth/reset-password", {
+      await axios.post(`${API_BASE_URL}/auth/reset-password`, {
         token,
         new_password: newPassword,
       });

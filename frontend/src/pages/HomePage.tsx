@@ -6,6 +6,8 @@ import { useAuthStore } from "../stores/authStore";
 import { GlassCard, GlassButton } from "../components/ui/GlassUI";
 import type { Food } from "../types/food";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export const HomePage = () => {
   const { token } = useAuthStore();
   const navigate = useNavigate();
@@ -41,7 +43,7 @@ export const HomePage = () => {
   const loadFoodStats = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch("http://localhost:8000/api/me/foods/", {
+      const res = await fetch(`${API_BASE_URL}/me/foods/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
