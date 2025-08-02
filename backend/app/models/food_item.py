@@ -18,7 +18,15 @@ class FoodCategory(PyEnum):
 
 class QuantityUnit(PyEnum):
     GRAM = "g"
+    KILOGRAM = "kg"
+    LITER = "L"
+    MILLILITER = "ml"
     PIECE = "個"
+    BOTTLE = "本"
+    BAG = "袋"
+    CAN = "缶"
+    BOX = "箱"
+    PACK = "パック"
 
 class FoodItem(Base):
     __tablename__ = "food_items"
