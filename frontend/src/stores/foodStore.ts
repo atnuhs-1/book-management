@@ -262,11 +262,16 @@ export const useFoodStore = create<FoodStore>()(
       }
     },
 
-    // 食品作成
-    createFood: async (foodData) => {
+    // foodStore.ts 内
+
+    createFood: async (foodData: FoodCreate & { force?: boolean }) => {
       set({ isLoading: true, error: null });
+
       try {
-        const response = await axios.post(`${API_BASE_URL}/foods`, foodData);
+        const response = await axios.post(`${API_BASE_URL}/foods`, foodData, {
+          params: foodData.force ? { force: true } : {}, // ← force をここに
+        });
+
         set((state) => ({
           foods: [...state.foods, response.data],
           isLoading: false,
@@ -291,6 +296,7 @@ export const useFoodStore = create<FoodStore>()(
         }
       }
     },
+
 
     // バーコードによる食品登録機能
     createFoodByBarcode: async (barcode: string, type: "JAN" | "EAN") => {

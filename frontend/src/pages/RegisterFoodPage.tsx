@@ -36,15 +36,15 @@ const foodCategories = [
 // ✅ 新規追加: 食品単位の選択肢
 const foodUnits = [
   { id: "個", name: "個", icon: "🔢", category: "count" },
-  // { id: "本", name: "本", icon: "📏", category: "count" },
-  // { id: "袋", name: "袋", icon: "🛍️", category: "count" },
-  // { id: "パック", name: "パック", icon: "📦", category: "count" },
-  // { id: "缶", name: "缶", icon: "🥫", category: "count" },
-  // { id: "箱", name: "箱", icon: "📦", category: "count" },
-  // { id: "kg", name: "キログラム", icon: "⚖️", category: "weight" },
+  { id: "本", name: "本", icon: "📏", category: "count" },
+  { id: "袋", name: "袋", icon: "🛍️", category: "count" },
+  { id: "パック", name: "パック", icon: "📦", category: "count" },
+  { id: "缶", name: "缶", icon: "🥫", category: "count" },
+  { id: "箱", name: "箱", icon: "📦", category: "count" },
+  { id: "kg", name: "キログラム", icon: "⚖️", category: "weight" },
   { id: "g", name: "グラム", icon: "⚖️", category: "weight" },
-  // { id: "L", name: "リットル", icon: "🧴", category: "volume" },
-  // { id: "ml", name: "ミリリットル", icon: "🧴", category: "volume" },
+  { id: "L", name: "リットル", icon: "🧴", category: "volume" },
+  { id: "ml", name: "ミリリットル", icon: "🧴", category: "volume" },
 ];
 
 type FoodItem = {
@@ -57,9 +57,13 @@ type FoodItem = {
   barcode_type?: "JAN" | "EAN";
 };
 
+
 export const RegisterFoodPage = () => {
   const { token, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const [forceConfirmVisible, setForceConfirmVisible] = useState(false);
+  const [pendingFoodData, setPendingFoodData] = useState<FoodCreate | null>(null);
+
 
   // ✅ 新規: foodStoreから新しい機能を取得
   const {
@@ -191,8 +195,7 @@ export const RegisterFoodPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // ✅ unit フィールドも必須チェックに追加
+  
     if (
       !food.name ||
       !food.category ||
@@ -204,36 +207,41 @@ export const RegisterFoodPage = () => {
       setError("すべての項目を正しく入力してください");
       return;
     }
-
-    // データ検証
+  
     const foodData: FoodCreate = {
       name: food.name.trim(),
       category: food.category as FoodCategory,
       quantity: Number(food.quantity),
-      unit: food.unit as FoodUnit, // ✅ 追加
+      unit: food.unit as FoodUnit,
       expiration_date: food.expiration_date,
       barcode: food.barcode,
       barcode_type: food.barcode_type,
     };
-
+  
     const validation = validateFoodData(foodData);
     if (!validation.isValid) {
       setError(`入力エラー:\n${validation.errors.join("\n")}`);
       return;
     }
-
+  
     try {
-      await createFood(foodData);
+      await createFood(foodData); // 通常登録
       alert("食品を登録しました！");
-
-      // フォームをリセット
-      setFood({ quantity: "1", unit: "個" }); // ✅ unit もリセット
+      setFood({ quantity: "1", unit: "個" });
       setMode(null);
       setDetectedProduct(null);
     } catch (err: any) {
-      console.error("食品登録エラー:", err);
+      if (err.message.includes("分類されません")) {
+        setPendingFoodData(foodData);
+        setForceConfirmVisible(true); // 確認モーダル表示
+      } else {
+        console.error("食品登録エラー:", err);
+        alert("登録に失敗しました: " + err.message);
+      }
     }
   };
+  
+  
 
   const selectedCategory = foodCategories.find((c) => c.id === food.category);
   const selectedUnit = foodUnits.find((u) => u.id === food.unit); // ✅ 選択された単位
@@ -670,6 +678,52 @@ export const RegisterFoodPage = () => {
           </GlassCard>
         </div>
       )}
+
+      {forceConfirmVisible && pendingFoodData && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-medium text-gray-800 text-center mb-2">
+              ⚠️ カテゴリ外の食品です
+            </h2>
+            <p className="text-sm text-gray-700 text-center whitespace-pre-line">
+              {pendingFoodData.name} は {pendingFoodData.category} に分類されませんが、
+              登録を続行しますか？
+            </p>
+            <div className="flex justify-center gap-4 pt-4">
+              <GlassButton
+                variant="primary"
+                onClick={async () => {
+                  try {
+                    await createFood({ ...pendingFoodData, force: true });
+                    alert("⚠️ カテゴリ外ですが登録しました！");
+                    setFood({ quantity: "1", unit: "個" });
+                    setMode(null);
+                    setDetectedProduct(null);
+                    setForceConfirmVisible(false);
+                    setPendingFoodData(null);
+                  } catch (e: any) {
+                    alert("強制登録に失敗しました: " + e.message);
+                    setForceConfirmVisible(false);
+                    setPendingFoodData(null);
+                  }
+                }}
+              >
+                登録を強行する
+              </GlassButton>
+              <GlassButton
+                variant="secondary"
+                onClick={() => {
+                  setForceConfirmVisible(false);
+                  setPendingFoodData(null);
+                }}
+              >
+                キャンセル
+              </GlassButton>
+            </div>
+          </div>
+  </div>
+)}
+
     </div>
   );
 };
