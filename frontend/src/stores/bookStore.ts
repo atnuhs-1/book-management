@@ -1,4 +1,4 @@
-// src/stores/bookStore.ts - 書籍検索登録機能追加版
+// src/stores/bookStore.ts - ウィッシュリスト機能追加版
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -20,15 +20,18 @@ interface BookStore {
   searchResults: GoogleBookInfo[];
   isSearching: boolean;
   selectedBook: Book | null;
-  // ✅ 新規追加: バーコード関連の状態
+  // ✅ 既存: バーコード関連の状態
   isRegisteringByISBN: boolean;
   lastScannedISBN: string | null;
-  // ✅ 新規追加: タイトル検索登録の状態
+  // ✅ 既存: タイトル検索登録の状態
   isRegisteringByTitle: boolean;
   titleSearchResults: GoogleBookInfo[];
   isTitleSearching: boolean;
+  // ✅ 新規追加: ウィッシュリスト関連の状態
+  isRegisteringToWishlist: boolean;
+  wishlistError: string | null;
 
-  // ✅ 新機能: 認証関連エラーの状態
+  // ✅ 既存: 認証関連エラーの状態
   lastAuthError: string | null;
   hasAuthError: boolean;
 
@@ -46,12 +49,12 @@ interface BookStore {
   setSelectedBook: (book: Book | null) => void;
   getBookById: (id: number) => Book | null;
 
-  // ✅ 新規追加: バーコード関連のアクション
+  // ✅ 既存: バーコード関連のアクション
   setRegisteringByISBN: (registering: boolean) => void;
   setLastScannedISBN: (isbn: string | null) => void;
   createBookByISBN: (isbn: string) => Promise<Book>;
 
-  // ✅ 新規追加: タイトル検索登録のアクション
+  // ✅ 既存: タイトル検索登録のアクション
   setRegisteringByTitle: (registering: boolean) => void;
   setTitleSearchResults: (results: GoogleBookInfo[]) => void;
   setTitleSearching: (searching: boolean) => void;
@@ -61,7 +64,12 @@ interface BookStore {
   ) => Promise<GoogleBookInfo[]>;
   createBookByTitle: (title: string) => Promise<Book>;
 
-  // ✅ 新機能: 認証エラー管理
+  // ✅ 新規追加: ウィッシュリスト関連のアクション
+  setRegisteringToWishlist: (registering: boolean) => void;
+  setWishlistError: (error: string | null) => void;
+  addToWishlist: (bookData: any) => Promise<Book>;
+
+  // ✅ 既存: 認証エラー管理
   setAuthError: (error: string | null) => void;
   clearAuthError: () => void;
 
@@ -133,6 +141,16 @@ const formatErrorMessage = (
         isAuthError: true,
       };
 
+    case 400:
+      // ✅ ウィッシュリスト固有のエラーメッセージ
+      if (data?.detail) {
+        return { message: data.detail, isAuthError: false };
+      }
+      return {
+        message: "リクエストに問題があります。",
+        isAuthError: false,
+      };
+
     case 403:
       return {
         message: "この操作を行う権限がありません。",
@@ -197,13 +215,16 @@ export const useBookStore = create<BookStore>()(
     selectedBook: null,
     lastAuthError: null,
     hasAuthError: false,
-    // ✅ バーコード関連の初期状態
+    // ✅ 既存: バーコード関連の初期状態
     isRegisteringByISBN: false,
     lastScannedISBN: null,
-    // ✅ 新規追加: タイトル検索登録の初期状態
+    // ✅ 既存: タイトル検索登録の初期状態
     isRegisteringByTitle: false,
     titleSearchResults: [],
     isTitleSearching: false,
+    // ✅ 新規追加: ウィッシュリスト関連の初期状態
+    isRegisteringToWishlist: false,
+    wishlistError: null,
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
@@ -229,13 +250,13 @@ export const useBookStore = create<BookStore>()(
       return books.find((b) => b.id === id) || null;
     },
 
-    // ✅ バーコード関連のアクション
+    // ✅ 既存: バーコード関連のアクション
     setRegisteringByISBN: (registering) =>
       set({ isRegisteringByISBN: registering }),
 
     setLastScannedISBN: (isbn) => set({ lastScannedISBN: isbn }),
 
-    // ✅ 新規追加: タイトル検索登録のアクション
+    // ✅ 既存: タイトル検索登録のアクション
     setRegisteringByTitle: (registering) =>
       set({ isRegisteringByTitle: registering }),
 
@@ -245,12 +266,56 @@ export const useBookStore = create<BookStore>()(
 
     clearTitleSearchResults: () => set({ titleSearchResults: [] }),
 
-    // ✅ 新機能: 認証エラー管理
+    // ✅ 新規追加: ウィッシュリスト関連のアクション
+    setRegisteringToWishlist: (registering) =>
+      set({ isRegisteringToWishlist: registering }),
+
+    setWishlistError: (error) => set({ wishlistError: error }),
+
+    // ✅ 既存: 認証エラー管理
     setAuthError: (error) =>
       set({ lastAuthError: error, hasAuthError: !!error }),
     clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
 
-    // 既存の関数（変更なし）
+    // ✅ 新機能: ウィッシュリストに追加
+    addToWishlist: async (bookData: any) => {
+      set({ isRegisteringToWishlist: true, wishlistError: null });
+
+      try {
+        const response = await axios.post(
+          `${API_BASE_URL}/books/wishlist-register`,
+          bookData,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const registeredBook = response.data;
+
+        set((state) => ({
+          books: [...state.books, registeredBook],
+          isRegisteringToWishlist: false,
+        }));
+
+        get().clearAuthError();
+        return registeredBook;
+      } catch (err: any) {
+        console.error("❌ ウィッシュリスト追加エラー:", err);
+        const { message, isAuthError } = formatErrorMessage(err);
+        if (isAuthError) {
+          get().setAuthError(message);
+          set({ isRegisteringToWishlist: false });
+          throw new Error("認証が必要です。再度ログインしてください。");
+        } else {
+          set({ wishlistError: message, isRegisteringToWishlist: false });
+          throw new Error(message);
+        }
+      }
+    },
+
+    // ✅ 既存の関数（変更なし）
     fetchBooks: async () => {
       set({ isLoading: true, error: null });
       try {
@@ -349,7 +414,7 @@ export const useBookStore = create<BookStore>()(
       }
     },
 
-    // ✅ 新機能: タイトル検索（登録用）
+    // ✅ 既存機能: タイトル検索（登録用）
     searchBooksByTitleForRegistration: async (title: string) => {
       set({ isTitleSearching: true, error: null });
       try {
@@ -374,7 +439,7 @@ export const useBookStore = create<BookStore>()(
       }
     },
 
-    // ✅ 新機能: タイトルによる書籍登録
+    // ✅ 既存機能: タイトルによる書籍登録
     createBookByTitle: async (title: string) => {
       set({
         isRegisteringByTitle: true,
