@@ -84,6 +84,7 @@ interface GlassButtonProps {
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   loading?: boolean;
+  type?: "button" | "submit" | "reset";
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({
@@ -94,6 +95,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   size = "md",
   disabled = false,
   loading = false,
+  type= "button",
 }) => {
   const baseClasses =
     "font-medium transition-all duration-300 rounded-xl backdrop-blur-xl shadow-xl";
@@ -119,6 +121,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled || loading}
       className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabledClasses} ${className}`}
@@ -160,7 +163,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
   icon,
 }) => {
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-1 bg-gray-100 rounded-lg${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-white">
           {label}
