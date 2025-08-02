@@ -9,12 +9,14 @@ type FoodItem = {
   name: string;
   category: string;
   quantity: number;
+  unit: string;
   expiration_date: string;
 };
 
 export const FoodExpiryPage = () => {
   const { token } = useAuthStore();
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const today = new Date();
 
   useEffect(() => {
     const fetchFoods = async () => {
@@ -36,16 +38,42 @@ export const FoodExpiryPage = () => {
     fetchFoods();
   }, [token]);
 
-  const today = new Date();
+  useEffect(() => {
+    const showAlert = () => {
+      const alertDays = [7, 5, 3, 1];
+      const alerted: string[] = [];
+      foodItems.forEach((item) => {
+        const diff = Math.ceil(
+          (new Date(item.expiration_date).getTime() - today.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+        if (alertDays.includes(diff)) {
+          alerted.push(`${item.name} があと ${diff} 日で期限です`);
+        }
+      });
+      if (alerted.length > 0) alert(alerted.join("\n"));
+    };
+    showAlert();
+  }, [foodItems]);
 
-  const expiredItems = foodItems.filter((item) => {
-    const expiry = new Date(item.expiration_date);
-    return expiry < today;
-  });
+  const handleEat = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("削除に失敗しました");
+      setFoodItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("食べた処理に失敗しました");
+    }
+  };
 
+  const expiredItems = foodItems.filter((item) => new Date(item.expiration_date) < today);
   const expiringItems = foodItems.filter((item) => {
     const expiry = new Date(item.expiration_date);
-    const diff = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    const diff = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return diff >= 0 && diff <= 3;
   });
 
@@ -65,10 +93,14 @@ export const FoodExpiryPage = () => {
               className="bg-red-50/50 backdrop-blur-sm rounded-xl p-4 border border-red-200/30"
             >
               <h3 className="font-medium text-red-800">{item.name}</h3>
-              <p className="text-sm text-red-600">
-                期限: {item.expiration_date}
-              </p>
-              <p className="text-sm text-gray-600">{item.quantity} 個</p>
+              <p className="text-sm text-red-600">期限: {item.expiration_date}</p>
+              <p className="text-sm text-gray-600">{item.quantity} {item.unit}</p>
+              <button
+                onClick={() => handleEat(item.id)}
+                className="mt-2 px-3 py-1 text-sm text-white bg-red-500 hover:bg-red-600 rounded"
+              >
+                食べた
+              </button>
             </div>
           ))}
         </div>
@@ -80,18 +112,27 @@ export const FoodExpiryPage = () => {
           期限間近 ({expiringItems.length}件)
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {expiringItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-amber-50/50 backdrop-blur-sm rounded-xl p-4 border border-amber-200/30"
-            >
-              <h3 className="font-medium text-amber-800">{item.name}</h3>
-              <p className="text-sm text-amber-600">
-                期限: {item.expiration_date}
-              </p>
-              <p className="text-sm text-gray-600">{item.quantity} 個</p>
-            </div>
-          ))}
+          {expiringItems.map((item) => {
+            const expiry = new Date(item.expiration_date);
+            const diff = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            return (
+              <div
+                key={item.id}
+                className="bg-amber-50/50 backdrop-blur-sm rounded-xl p-4 border border-amber-200/30"
+              >
+                <h3 className="font-medium text-amber-800">{item.name}</h3>
+                <p className="text-sm text-amber-600">期限: {item.expiration_date}</p>
+                <p className="text-sm text-gray-600">あと {diff} 日</p>
+                <p className="text-sm text-gray-600">{item.quantity} {item.unit}</p>
+                <button
+                  onClick={() => handleEat(item.id)}
+                  className="mt-2 px-3 py-1 text-sm text-white bg-amber-500 hover:bg-amber-600 rounded"
+                >
+                  食べた
+                </button>
+              </div>
+            );
+          })}
         </div>
       </GlassCard>
     </div>
