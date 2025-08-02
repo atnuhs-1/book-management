@@ -26,6 +26,7 @@ class FoodCategory(str, Enum):
 
     # 飲料
     BEVERAGES = "飲料"
+    OTHER = "その他"
 
 # ✅ 単位（新しく追加）
 class QuantityUnit(str, Enum):

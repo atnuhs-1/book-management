@@ -25,6 +25,7 @@ def validate_food_category(food_name: str, category: str) -> bool:
         f"- 米、パン、麺\n"
         f"- 調味料\n"
         f"- 飲料\n"
+        f"- その他\n"
         f"「はい」または「いいえ」で答えてください。"
     )
 

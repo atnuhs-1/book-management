@@ -29,6 +29,7 @@ class FoodCategory(PyEnum):
 
     # 飲料
     BEVERAGES = "飲料"
+    OTHER = "その他"
 
 class QuantityUnit(PyEnum):
     GRAM = "g"
