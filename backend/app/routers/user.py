@@ -3,7 +3,8 @@ from app.core.auth import (create_access_token, get_current_user,
 from app.core.database import get_db
 from app.crud import user as crud_user
 from app.models.user import User
-from app.schemas.user import (ChangePasswordRequest, TokenWithUser,
+from app.schemas.user import (ChangePasswordRequest, PasswordResetConfirm,
+                              PasswordResetRequest, TokenWithUser,
                               UpdateUserRequest, UserCreate, UserOut)
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -94,3 +95,33 @@ def change_password(
     db.commit()
 
     return {"message": "パスワードを変更しました"}
+
+from app.core.auth import get_password_hash  # ← これでハッシュ関数共通化
+from app.core.email import send_reset_email
+from app.crud.user import get_user_by_email
+from app.utils.token import generate_reset_token, verify_reset_token
+
+
+@router.post("/request-password-reset")
+async def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    user = get_user_by_email(db, data.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+
+    token = generate_reset_token(user.email)
+    await send_reset_email(user.email, token)
+    return {"message": "パスワードリセットリンクを送信しました"}
+
+@router.post("/reset-password")
+def reset_password(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    email = verify_reset_token(data.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="無効または期限切れのトークンです")
+
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+
+    user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+    return {"message": "パスワードが正常にリセットされました"}

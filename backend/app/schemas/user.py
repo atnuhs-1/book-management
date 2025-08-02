@@ -37,3 +37,10 @@ class UpdateUserRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: Annotated[str, StringConstraints(min_length=6)]
     new_password: Annotated[str, StringConstraints(min_length=6)]
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: Annotated[str, StringConstraints(min_length=6)]

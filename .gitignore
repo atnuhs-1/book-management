@@ -102,7 +102,7 @@ tmp/
 **/secrets/
 **/*secret*
 **/*key*
-**/*token*
+# **/*token*
 !**/package.json
 !**/pyproject.toml
 
