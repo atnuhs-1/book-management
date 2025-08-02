@@ -12,15 +12,15 @@ export type FoodCategory =
 // 食品の単位の列挙型
 export type FoodUnit =
   | "個"
-  // | "本"
-  // | "袋"
-  // | "パック"
-  // | "kg"
+  | "本"
+  | "袋"
+  | "パック"
+  | "kg"
   | "g"
-  // | "L"
-  // | "ml"
-  // | "缶"
-  // | "箱";
+  | "L"
+  | "ml"
+  | "缶"
+  | "箱";
 
 // バックエンドのスキーマに対応した食品型
 export interface Food {
@@ -120,19 +120,19 @@ export const FOOD_CATEGORIES: FoodCategoryInfo[] = [
 export const FOOD_UNITS: FoodUnitInfo[] = [
   // 個数系
   { id: "個", name: "個", shortName: "個", category: "count" },
-  // { id: "本", name: "本", shortName: "本", category: "count" },
-  // { id: "袋", name: "袋", shortName: "袋", category: "count" },
-  // { id: "パック", name: "パック", shortName: "パック", category: "count" },
-  // { id: "缶", name: "缶", shortName: "缶", category: "count" },
-  // { id: "箱", name: "箱", shortName: "箱", category: "count" },
+  { id: "本", name: "本", shortName: "本", category: "count" },
+  { id: "袋", name: "袋", shortName: "袋", category: "count" },
+  { id: "パック", name: "パック", shortName: "パック", category: "count" },
+  { id: "缶", name: "缶", shortName: "缶", category: "count" },
+  { id: "箱", name: "箱", shortName: "箱", category: "count" },
 
   // 重量系
-  // { id: "kg", name: "キログラム", shortName: "kg", category: "weight" },
+  { id: "kg", name: "キログラム", shortName: "kg", category: "weight" },
   { id: "g", name: "グラム", shortName: "g", category: "weight" },
 
   // 容量系
-  // { id: "L", name: "リットル", shortName: "L", category: "volume" },
-  // { id: "ml", name: "ミリリットル", shortName: "ml", category: "volume" },
+  { id: "L", name: "リットル", shortName: "L", category: "volume" },
+  { id: "ml", name: "ミリリットル", shortName: "ml", category: "volume" },
 ] as const;
 
 // 賞味期限の状態

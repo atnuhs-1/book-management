@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { GlassCard, GlassInput } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
+import { FOOD_UNITS } from "../types/food";
+
 
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️" },
   { id: "FRESH", name: "生鮮食品", icon: "🥬" },
-  { id: "EMERGENCY", name: "非常食", icon: "🥫" },
+  { id: "EMERGENCY", name: "非常食", icon: "🥢" },
   { id: "BEVERAGES", name: "飲料", icon: "🥤" },
-  { id: "SEASONINGS", name: "調味料", icon: "🧂" },
-  { id: "FROZEN", name: "冷凍食品", icon: "🧊" },
+  { id: "SEASONINGS", name: "調味料", icon: "🠂" },
+  { id: "FROZEN", name: "冷凍食品", icon: "🤊" },
   { id: "SNACKS", name: "お菓子", icon: "🍪" },
 ];
 
@@ -20,8 +22,17 @@ export const FoodPage = () => {
   const { token } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showModal, setShowModal] = useState(false);
   const [foodItems, setFoodItems] = useState([]);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    quantity: "",
+    unit: "g",
+    expiration_date: "",
+  });
+  const [forceEditConfirmVisible, setForceEditConfirmVisible] = useState(false);
+  const [editErrorMessage, setEditErrorMessage] = useState("");
 
   useEffect(() => {
     const fetchFoods = async () => {
@@ -33,7 +44,6 @@ export const FoodPage = () => {
         });
 
         if (!res.ok) throw new Error("食品の取得に失敗しました");
-
         const data = await res.json();
         setFoodItems(data);
       } catch (err) {
@@ -61,36 +71,6 @@ export const FoodPage = () => {
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = async (id: number) => {
-    const confirmDelete = window.confirm("この食品を削除しますか？");
-    if (!confirmDelete) return;
-
-    try {
-      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) throw new Error("削除に失敗しました");
-
-      setFoodItems((prev) => prev.filter((item: any) => item.id !== id));
-    } catch (err) {
-      console.error(err);
-      alert("削除に失敗しました");
-    }
-  };
-
-  const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    category: "",
-    quantity: "",
-    unit: "g",
-    expiration_date: "",
-  });
-
   const handleEdit = (item: any) => {
     setEditingItem(item);
     setEditForm({
@@ -102,11 +82,14 @@ export const FoodPage = () => {
     });
   };
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (force = false) => {
     if (!editingItem) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/foods/${editingItem.id}`, {
+      const url = new URL(`http://localhost:8000/api/foods/${editingItem.id}`);
+      if (force) url.searchParams.set("force", "true");
+
+      const res = await fetch(url.toString(), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -121,16 +104,48 @@ export const FoodPage = () => {
         }),
       });
 
-      if (!res.ok) throw new Error("更新に失敗しました");
+      if (!res.ok) {
+        let errorDetail = "更新に失敗しました";
+        try {
+          const errJson = await res.json();
+          if (res.status === 409 && errJson.detail?.includes("分類されません")) {
+            setEditErrorMessage(errJson.detail);
+            setForceEditConfirmVisible(true);
+            return;
+          }
+          if (errJson.detail) errorDetail = errJson.detail;
+        } catch (e) {
+          console.error("エラーレスポンスの解析に失敗:", e);
+        }
+        throw new Error(errorDetail);
+      }
 
       const updated = await res.json();
       setFoodItems((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
       setEditingItem(null);
+      alert("✅ 食品を更新しました");
+    } catch (err: any) {
+      console.error(err);
+      alert("更新に失敗しました: " + err.message);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    const confirmDelete = window.confirm("この食品を削除しますか？");
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("削除に失敗しました");
+      setFoodItems((prev) => prev.filter((item: any) => item.id !== id));
     } catch (err) {
       console.error(err);
-      alert("更新に失敗しました");
+      alert("削除に失敗しました");
     }
   };
 
@@ -216,7 +231,6 @@ export const FoodPage = () => {
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
             <h2 className="text-lg font-semibold text-gray-800">食品情報の編集</h2>
-
             <div className="space-y-3">
               <label className="block">
                 <span className="text-sm text-gray-600">食品名</span>
@@ -227,7 +241,6 @@ export const FoodPage = () => {
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 />
               </label>
-
               <label className="block">
                 <span className="text-sm text-gray-600">カテゴリ</span>
                 <select
@@ -235,16 +248,13 @@ export const FoodPage = () => {
                   onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 >
-                  {foodCategories
-                    .filter((c) => c.id !== "all")
-                    .map((c) => (
-                      <option key={c.id} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
+                  {foodCategories.filter((c) => c.id !== "all").map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
               </label>
-
               <label className="block">
                 <span className="text-sm text-gray-600">数量</span>
                 <input
@@ -254,7 +264,6 @@ export const FoodPage = () => {
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 />
               </label>
-
               <label className="block">
                 <span className="text-sm text-gray-600">単位</span>
                 <select
@@ -262,8 +271,10 @@ export const FoodPage = () => {
                   onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 >
-                  {quantityUnits.map((unit) => (
-                    <option key={unit} value={unit}>{unit}</option>
+                  {FOOD_UNITS.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -278,7 +289,6 @@ export const FoodPage = () => {
                 />
               </label>
             </div>
-
             <div className="flex justify-end gap-2 pt-4">
               <button
                 onClick={() => setEditingItem(null)}
@@ -287,10 +297,41 @@ export const FoodPage = () => {
                 キャンセル
               </button>
               <button
-                onClick={handleUpdate}
+                onClick={() => handleUpdate()}
                 className="px-4 py-2 text-sm rounded text-white bg-green-500 hover:bg-green-600"
               >
                 保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {forceEditConfirmVisible && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl space-y-4">
+            <h2 className="text-lg font-medium text-gray-800 text-center">
+              ⚠️ カテゴリ外の食品です
+            </h2>
+            <p className="text-sm text-gray-700 text-center whitespace-pre-line">
+              {editErrorMessage}
+              {"\n\n"}このまま変更を強行しますか？
+            </p>
+            <div className="flex justify-center gap-4 pt-4">
+              <button
+                onClick={() => {
+                  setForceEditConfirmVisible(false);
+                  handleUpdate(true);
+                }}
+                className="px-4 py-2 text-sm rounded text-white bg-red-500 hover:bg-red-600"
+              >
+                強行して保存
+              </button>
+              <button
+                onClick={() => setForceEditConfirmVisible(false)}
+                className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
+              >
+                キャンセル
               </button>
             </div>
           </div>
