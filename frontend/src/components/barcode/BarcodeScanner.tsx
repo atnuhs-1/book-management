@@ -31,8 +31,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   onBarcodeDetected,
   supportedTypes = ["ISBN"], // デフォルトはISBNのみ（既存動作を維持）
   onClose,
-  title = "バーコードスキャン",
-  subtitle = "バーコードをカメラに向けてください",
 }) => {
   const {
     isScanning,
@@ -75,6 +73,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         if (onBarcodeDetected) {
           await onBarcodeDetected(result);
         }
+        // 正常終了時もリセット
+        setIsProcessing(false);
+        setDetectedBarcode(null);
       } catch (error) {
         console.error("バーコード処理エラー:", error);
         // エラーが発生した場合はスキャンを再開可能にする
@@ -238,14 +239,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   return (
     <GlassCard className="p-6">
       <div className="text-center">
-        <h3 className="text-2xl font-light text-gray-800 mb-2 flex items-center justify-center">
-          <span className="mr-3">📷</span>
-          {title}
-        </h3>
-        <p className="text-gray-600 mb-6">
-          {subtitle || `${getSupportedTypesText()}をカメラに向けてください`}
-        </p>
-
         {/* サポートされているバーコード種別の表示 */}
         {supportedTypes.length > 1 && (
           <div className="mb-4 p-3 bg-blue-50/30 backdrop-blur-sm rounded-xl border border-blue-200/30">

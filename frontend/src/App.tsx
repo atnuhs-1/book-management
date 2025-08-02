@@ -23,6 +23,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage"; // ✅ 追加
 import { ResetPasswordPage } from "./pages/ResetPasswordPage"; // ✅
 
 import { SearchBooksPage } from "./pages/SearchBooksPage";
+import { BarcodeScanPage } from "./pages/BarcodeScanPage";
 
 const AuthErrorNotification = () => {
   const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
@@ -115,9 +116,10 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} /> {/* ✅ 追加 */}
-        <Route path="/reset-password" element={<ResetPasswordPage />} /> {/* ✅ 追加 */}
-
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />{" "}
+        {/* ✅ 追加 */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />{" "}
+        {/* ✅ 追加 */}
         {/* 通常のページ（レイアウト付き） */}
         <Route
           path="*"
@@ -169,13 +171,19 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-
-                {/* ✅ 重要: AddBookPageをProtectedRouteに追加 */}
                 <Route
                   path="/add-book"
                   element={
                     <ProtectedRoute>
                       <AddBookPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/barcode-scan"
+                  element={
+                    <ProtectedRoute>
+                      <BarcodeScanPage />
                     </ProtectedRoute>
                   }
                 />
