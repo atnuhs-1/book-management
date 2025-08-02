@@ -34,7 +34,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       {children}
     </div>
   );
-};  
+};
 
 interface GlassInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -84,6 +84,7 @@ interface GlassButtonProps {
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   loading?: boolean;
+  type?: "button" | "submit" | "reset";
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({
@@ -94,6 +95,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   size = "md",
   disabled = false,
   loading = false,
+  type= "button",
 }) => {
   const baseClasses =
     "font-medium transition-all duration-300 rounded-xl backdrop-blur-xl shadow-xl";
@@ -119,6 +121,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled || loading}
       className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabledClasses} ${className}`}
@@ -137,7 +140,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
 // ✅ グラス入力フィールドコンポーネント
 interface GlassInputProps {
-  label?: string; 
+  label?: string;
   type?: string;
   placeholder?: string;
   value: string;
@@ -160,7 +163,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
   icon,
 }) => {
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-1 bg-gray-100 rounded-lg${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-white">
           {label}
@@ -169,7 +172,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
 
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 z-10">
             {icon}
           </div>
         )}

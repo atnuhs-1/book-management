@@ -17,6 +17,11 @@ from app.services.validate_category import validate_food_category
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+import os
+import requests
+from dotenv import load_dotenv
+from urllib.parse import urlencode
+from app.services.validate_category import validate_food_category  # ✅ 追加
 
 router = APIRouter(prefix="/api", tags=["food_items"])
 
@@ -294,6 +299,7 @@ def delete_food(
 ):
     return crud_food.delete_food_item(db, food_id, current_user.id)
 
+
 @router.get("/foods/{food_id}/stock_quantity")
 def get_stock_quantity(
     food_id: int,
@@ -305,3 +311,36 @@ def get_stock_quantity(
         raise HTTPException(status_code=404, detail="食材が見つかりません")
 
     return {"quantity": food.quantity}
+
+@router.post("/foods/from_barcode_auto", summary="JANコードから食品登録（自動数量・単位）")
+def register_food_auto(
+    barcode: str = Query(..., min_length=8, max_length=13),
+    category: FoodCategory = Query(..., description="カテゴリを明示的に指定（例: 飲料）"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 🔍 商品情報取得
+    item, _ = fetch_jancode_product(barcode)
+    from app.crud.food_item import extract_quantity_and_unit
+
+    quantity, unit = extract_quantity_and_unit(item.get("ProductDetails", {}))
+    food_name = item.get("itemName", "名称不明")
+
+    # ✅ OpenAIでカテゴリの妥当性をチェック
+    if not validate_food_category(food_name, category.value):
+        raise HTTPException(
+            status_code=400,
+            detail=f"「{food_name}」は「{category.value}」に分類されません"
+        )
+
+    # ✅ 登録処理
+    food = FoodItemCreate(
+        name=food_name,
+        category=category,
+        quantity=quantity,
+        unit=unit,
+        expiration_date=date.today() + timedelta(days=30)
+    )
+
+    return crud_food.create_food_item(db, current_user.id, food)
+

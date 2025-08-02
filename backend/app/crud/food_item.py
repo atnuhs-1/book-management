@@ -4,6 +4,28 @@ from app.models.food_item import FoodCategory, FoodItem
 from app.schemas.food_item import FoodItemCreate
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+import re
+
+def extract_quantity_and_unit(product_details: dict) -> tuple[int, str]:
+    try:
+        # 優先：単品（個装）入数
+        if "単品（個装）入数" in product_details:
+            count_str = product_details.get("単品（個装）入数", "").strip()
+            if count_str.isdigit():
+                return (int(count_str), "個")
+
+        # 次点：単品容量（例：500ml, 200gなど）
+        unit_str = product_details.get("単品容量", "").strip()
+        match = re.match(r"(\d+)([a-zA-Zぁ-んァ-ンーａ-ｚＡ-Ｚｱ-ﾝﾞﾟ]+)", unit_str)
+        if match:
+            amount = int(match.group(1))
+            unit = match.group(2)
+            return (amount, unit)
+
+    except Exception:
+        pass
+
+    return (1, "個")  # fallback
 
 
 def create_food_item(db: Session, user_id: int, item: FoodItemCreate):

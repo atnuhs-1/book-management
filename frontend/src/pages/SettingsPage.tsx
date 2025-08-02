@@ -3,6 +3,7 @@ import axios from "axios";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom"; // 🔹追加
 
 export const SettingsPage = () => {
   const { theme, toggleTheme } = useThemeStore();
@@ -209,6 +210,16 @@ export const SettingsPage = () => {
                   {showNewPassword ? "🙈" : "👁"}
                 </button>
               </div>
+              <p className="text-sm text-gray-600 mt-2">
+                  パスワードをお忘れの方は
+                  <Link
+                    to="/forgot-password"
+                    className="text-indigo-600 underline hover:text-indigo-800 ml-1"
+                  >
+                    こちらから再設定
+                  </Link>
+                  できます。
+                </p>
             </div>
 
             <button

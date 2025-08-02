@@ -5,6 +5,7 @@ from sqlalchemy import Column, Date
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from typing import Optional  # これが必要！
 
 
 # ✅ 表示用に日本語、DBには日本語文字列を保存
@@ -24,12 +25,16 @@ class FoodCategory(PyEnum):
 
     # その他食品
     SNACKS = "お菓子"
+
     STAPLE = "米、パン、麺"
     SEASONING = "調味料"
 
     # 飲料
     BEVERAGES = "飲料"
     OTHER = "その他"
+
+    # OTHER = "その他"
+
 
 class QuantityUnit(PyEnum):
     GRAM = "g"
@@ -56,7 +61,7 @@ class FoodItem(Base):
             name="foodcategory",  # DB上の型名
             values_callable=lambda enum_cls: [e.value for e in enum_cls]  # ✅ value を保存
         ),
-        nullable=False
+        nullable=True #　とりあえず今は何も入れなくてもokということになっています。後で変えます
     )
 
     unit = Column(

@@ -34,12 +34,17 @@ export const BooksPage = () => {
     loadBooks();
   }, [loadBooks]);
 
-  // フィルタリングロジック
   const filteredBooks = books.filter((book) => {
+    // 安全なアクセス：null/undefinedの場合は空文字に変換
+    const title = (book.title || "").toLowerCase();
+    const author = (book.author || "").toLowerCase();
+    const publisher = (book.publisher || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
+
     return (
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.publisher.toLowerCase().includes(searchQuery.toLowerCase())
+      title.includes(query) ||
+      author.includes(query) ||
+      publisher.includes(query)
     );
   });
 
@@ -49,16 +54,16 @@ export const BooksPage = () => {
 
     switch (sortBy) {
       case "title":
-        aValue = a.title.toLowerCase();
-        bValue = b.title.toLowerCase();
+        aValue = (a.title || "").toLowerCase();
+        bValue = (b.title || "").toLowerCase();
         break;
       case "author":
-        aValue = a.author.toLowerCase();
-        bValue = b.author.toLowerCase();
+        aValue = (a.author || "").toLowerCase();
+        bValue = (b.author || "").toLowerCase();
         break;
       case "published_date":
-        aValue = new Date(a.published_date).getTime();
-        bValue = new Date(b.published_date).getTime();
+        aValue = new Date(a.published_date || 0).getTime();
+        bValue = new Date(b.published_date || 0).getTime();
         break;
       case "created_at":
       default:
@@ -139,7 +144,7 @@ export const BooksPage = () => {
       {/* ヘッダー */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <h1 className="text-4xl font-light text-gray-800">📚 書籍一覧</h1>
+          <h1 className="text-4xl font-light text-gray-800">書籍一覧</h1>
           <div className="flex gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
               <GlassInput
@@ -266,7 +271,9 @@ export const BooksPage = () => {
 
                 {/* 出版情報 */}
                 <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span className="truncate">{book.publisher}</span>
+                  <span className="truncate">
+                    {book.publisher || "出版社不明"}
+                  </span>
                   <span>{new Date(book.published_date).getFullYear()}年</span>
                 </div>
 
