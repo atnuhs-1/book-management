@@ -8,7 +8,8 @@ from app.core.database import get_db
 from app.crud import food_item as crud_food
 from app.models.food_item import FoodCategory
 from app.models.user import User
-from app.schemas.food_item import FoodItemCreate, FoodItemRead
+from app.schemas.food_item import (FoodItemCreate, FoodItemRead,
+                                   FoodUsageRequest)
 from app.services.hybrid_recipe import hybrid_recipe_suggestion
 from app.services.recipe_chatgpt import \
     generate_recipe_focused_on_main_ingredient
@@ -232,11 +233,43 @@ def get_food(
         raise HTTPException(status_code=404, detail="Food not found")
     return food
 
+@router.post("/foods/{food_id}/use")
+def use_food(
+    food_id: int,
+    data: FoodUsageRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    used_quantity = data.used_quantity
+    food = crud_food.get_food_item_by_id(db, food_id)
+
+    if not food or food.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="食材が見つかりません")
+
+    if used_quantity <= 0:
+        raise HTTPException(status_code=400, detail="使用量は1以上で指定してください")
+
+    if food.quantity < used_quantity:
+        raise HTTPException(status_code=400, detail="使用量が在庫を超えています")
+
+    food.quantity -= used_quantity
+
+    if food.quantity == 0:
+        db.delete(food)
+        db.commit()
+        return {"message": f"{food.name} をすべて使い切りました。"}
+
+    db.commit()
+    db.refresh(food)
+    return {
+        "message": f"{food.name} を {used_quantity}{food.unit.value} 使用しました。残量: {food.quantity}{food.unit.value}",
+        "remaining_quantity": food.quantity
+    }
+
+
+
 
 # ✅ PUT /api/foods/{food_id}
-from fastapi import Query
-
-
 @router.put("/foods/{food_id}", response_model=FoodItemRead)
 def update_food(
     food_id: int,
@@ -265,6 +298,19 @@ def delete_food(
     current_user: User = Depends(get_current_user)
 ):
     return crud_food.delete_food_item(db, food_id, current_user.id)
+
+
+@router.get("/foods/{food_id}/stock_quantity")
+def get_stock_quantity(
+    food_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    food = crud_food.get_food_item_by_id(db, food_id)
+    if not food or food.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="食材が見つかりません")
+
+    return {"quantity": food.quantity}
 
 @router.post("/foods/from_barcode_auto", summary="JANコードから食品登録（自動数量・単位）")
 def register_food_auto(
@@ -297,3 +343,4 @@ def register_food_auto(
     )
 
     return crud_food.create_food_item(db, current_user.id, food)
+
