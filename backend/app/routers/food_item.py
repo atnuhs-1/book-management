@@ -122,14 +122,21 @@ def lookup_food_name(
 @router.post("/foods", response_model=FoodItemRead)
 def create_food(
     food: FoodItemCreate,
+    force: bool = Query(False),  # ← ここに注目
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # ChatGPT でカテゴリが妥当かを確認
     if not validate_food_category(food.name, food.category.value):
-        raise HTTPException(status_code=400, detail=f"{food.name} は {food.category.value} に分類されません")
+        if not force:
+            # 確認メッセージだけ返す（登録はまだしない）
+            raise HTTPException(
+                status_code=409,
+                detail=f"{food.name}は{food.category.value}に分類されませんが、本当に追加してよろしいですか？"
+            )
+        # force=True のときだけ、強行して登録続行
 
     return crud_food.create_food_item(db, current_user.id, food)
+
 
 
 # ✅ GET /api/me/foods
@@ -222,20 +229,27 @@ def get_food(
 
 
 # ✅ PUT /api/foods/{food_id}
+from fastapi import Query
+
+
 @router.put("/foods/{food_id}", response_model=FoodItemRead)
 def update_food(
     food_id: int,
     food_update: FoodItemCreate,
+    force: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if not validate_food_category(food_update.name, food_update.category.value):
-        raise HTTPException(
-            status_code=400,
-            detail=f"{food_update.name} は {food_update.category.value} に分類されません"
-        )
+        if not force:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{food_update.name}は{food_update.category.value}に分類されませんが、本当に変更してよろしいですか？"
+            )
+        # force=True の場合は続行
 
     return crud_food.update_food_item(db, food_id, food_update, current_user.id)
+
 
 
 # ✅ DELETE /api/foods/{food_id}
