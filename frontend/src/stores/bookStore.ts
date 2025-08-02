@@ -1,4 +1,4 @@
-// src/stores/bookStore.ts - ウィッシュリスト機能追加版
+// src/stores/bookStore.ts - ウィッシュリスト取得機能追加版
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -20,16 +20,24 @@ interface BookStore {
   searchResults: GoogleBookInfo[];
   isSearching: boolean;
   selectedBook: Book | null;
+
   // ✅ 既存: バーコード関連の状態
   isRegisteringByISBN: boolean;
   lastScannedISBN: string | null;
+
   // ✅ 既存: タイトル検索登録の状態
   isRegisteringByTitle: boolean;
   titleSearchResults: GoogleBookInfo[];
   isTitleSearching: boolean;
-  // ✅ 新規追加: ウィッシュリスト関連の状態
+
+  // ✅ 既存: ウィッシュリスト登録関連の状態
   isRegisteringToWishlist: boolean;
   wishlistError: string | null;
+
+  // ✅ 新規追加: ウィッシュリスト取得関連の状態
+  wishlistBooks: Book[];
+  isLoadingWishlist: boolean;
+  wishlistFetchError: string | null;
 
   // ✅ 既存: 認証関連エラーの状態
   lastAuthError: string | null;
@@ -64,10 +72,17 @@ interface BookStore {
   ) => Promise<GoogleBookInfo[]>;
   createBookByTitle: (title: string) => Promise<Book>;
 
-  // ✅ 新規追加: ウィッシュリスト関連のアクション
+  // ✅ 既存: ウィッシュリスト登録関連のアクション
   setRegisteringToWishlist: (registering: boolean) => void;
   setWishlistError: (error: string | null) => void;
   addToWishlist: (bookData: any) => Promise<Book>;
+
+  // ✅ 新規追加: ウィッシュリスト取得関連のアクション
+  setWishlistBooks: (books: Book[]) => void;
+  setLoadingWishlist: (loading: boolean) => void;
+  setWishlistFetchError: (error: string | null) => void;
+  fetchWishlist: () => Promise<void>;
+  clearWishlist: () => void;
 
   // ✅ 既存: 認証エラー管理
   setAuthError: (error: string | null) => void;
@@ -215,16 +230,24 @@ export const useBookStore = create<BookStore>()(
     selectedBook: null,
     lastAuthError: null,
     hasAuthError: false,
+
     // ✅ 既存: バーコード関連の初期状態
     isRegisteringByISBN: false,
     lastScannedISBN: null,
+
     // ✅ 既存: タイトル検索登録の初期状態
     isRegisteringByTitle: false,
     titleSearchResults: [],
     isTitleSearching: false,
-    // ✅ 新規追加: ウィッシュリスト関連の初期状態
+
+    // ✅ 既存: ウィッシュリスト登録関連の初期状態
     isRegisteringToWishlist: false,
     wishlistError: null,
+
+    // ✅ 新規追加: ウィッシュリスト取得関連の初期状態
+    wishlistBooks: [],
+    isLoadingWishlist: false,
+    wishlistFetchError: null,
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
@@ -232,6 +255,10 @@ export const useBookStore = create<BookStore>()(
     updateBook: (updatedBook) =>
       set((state) => ({
         books: state.books.map((book) =>
+          book.id === updatedBook.id ? updatedBook : book
+        ),
+        // ✅ ウィッシュリストも同時更新
+        wishlistBooks: state.wishlistBooks.map((book) =>
           book.id === updatedBook.id ? updatedBook : book
         ),
       })),
@@ -266,18 +293,70 @@ export const useBookStore = create<BookStore>()(
 
     clearTitleSearchResults: () => set({ titleSearchResults: [] }),
 
-    // ✅ 新規追加: ウィッシュリスト関連のアクション
+    // ✅ 既存: ウィッシュリスト登録関連のアクション
     setRegisteringToWishlist: (registering) =>
       set({ isRegisteringToWishlist: registering }),
 
     setWishlistError: (error) => set({ wishlistError: error }),
+
+    // ✅ 新規追加: ウィッシュリスト取得関連のアクション
+    setWishlistBooks: (books) => set({ wishlistBooks: books }),
+
+    setLoadingWishlist: (loading) => set({ isLoadingWishlist: loading }),
+
+    setWishlistFetchError: (error) => set({ wishlistFetchError: error }),
+
+    clearWishlist: () =>
+      set({
+        wishlistBooks: [],
+        wishlistFetchError: null,
+      }),
 
     // ✅ 既存: 認証エラー管理
     setAuthError: (error) =>
       set({ lastAuthError: error, hasAuthError: !!error }),
     clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
 
-    // ✅ 新機能: ウィッシュリストに追加
+    // ✅ 新機能: ウィッシュリスト取得
+    fetchWishlist: async () => {
+      set({
+        isLoadingWishlist: true,
+        wishlistFetchError: null,
+      });
+
+      try {
+        const response = await axios.get(`${API_BASE_URL}/me/wishlist`);
+
+        // ✅ バックエンドから返されるBookOut[]をBook[]として扱う
+        // amazon_urlフィールドが追加されている可能性があるが、Book型は柔軟に対応
+        const wishlistBooks = response.data;
+
+        set({
+          wishlistBooks,
+          isLoadingWishlist: false,
+        });
+
+        get().clearAuthError();
+      } catch (err: any) {
+        console.error("❌ ウィッシュリスト取得エラー:", err);
+        const { message, isAuthError } = formatErrorMessage(err);
+
+        if (isAuthError) {
+          get().setAuthError(message);
+          set({
+            isLoadingWishlist: false,
+            wishlistBooks: [], // 認証エラー時はクリア
+          });
+        } else {
+          set({
+            wishlistFetchError: message,
+            isLoadingWishlist: false,
+          });
+        }
+      }
+    },
+
+    // ✅ 既存機能: ウィッシュリストに追加
     addToWishlist: async (bookData: any) => {
       set({ isRegisteringToWishlist: true, wishlistError: null });
 
@@ -296,6 +375,8 @@ export const useBookStore = create<BookStore>()(
 
         set((state) => ({
           books: [...state.books, registeredBook],
+          // ✅ ウィッシュリストにも追加
+          wishlistBooks: [...state.wishlistBooks, registeredBook],
           isRegisteringToWishlist: false,
         }));
 

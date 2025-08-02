@@ -22,6 +22,7 @@ import { useAuthStore } from "./stores/authStore";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage"; // ✅ 追加
 import { ResetPasswordPage } from "./pages/ResetPasswordPage"; // ✅
 
+import { SearchBooksPage } from "./pages/SearchBooksPage";
 
 const AuthErrorNotification = () => {
   const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
@@ -125,6 +126,7 @@ function App() {
               <Routes>
                 {/* ✅ パブリックページ - 認証不要 */}
                 <Route path="/" element={<HomePage />} />
+                <Route path="/search-books" element={<SearchBooksPage />} />
 
                 {/* ✅ 認証が必要なページ - ProtectedRouteで保護 */}
                 <Route

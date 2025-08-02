@@ -1,121 +1,165 @@
-// frontend/src/pages/WishlistPage.tsx - ウィッシュリスト機能
-
-import { useState } from "react";
-import { useBookStore } from "../stores/bookStore";
-import { useAuthStore } from "../stores/authStore";
-import { useNavigate } from "react-router-dom";
-import type { GoogleBookInfo } from "../types/book";
+// src/pages/WishlistPage.tsx - ウィッシュリスト表示ページ
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  GlassCard,
   GlassButton,
-  GlassInput,
+  GlassCard,
+  GlassEmptyState,
   GlassError,
+  GlassInput,
   GlassLoading,
 } from "../components/ui/GlassUI";
-import { PLACEHOLDER_IMAGE } from "../constants/images";
+import { useAuthStore } from "../stores/authStore";
+import { useBookStore } from "../stores/bookStore";
+import { BookStatusEnum } from "../types/book";
 
 export const WishlistPage = () => {
-  // ✅ bookStoreから検索機能とウィッシュリスト機能を取得
   const {
-    searchBooksByTitleForRegistration,
-    isTitleSearching,
-    titleSearchResults,
-    clearTitleSearchResults,
-    addToWishlist,
-    isRegisteringToWishlist,
-    error,
-    wishlistError,
+    wishlistBooks,
+    isLoadingWishlist,
+    wishlistFetchError,
+    fetchWishlist,
+    updateBookById,
   } = useBookStore();
+  const { isAuthenticated, isInitialized } = useAuthStore();
 
-  const { isAuthenticated } = useAuthStore();
-  const navigate = useNavigate();
+  // ローカル検索状態
+  const [searchQuery, setSearchQuery] = useState("");
+  // ソート状態
+  const [sortBy, setSortBy] = useState<
+    "title" | "author" | "published_date" | "created_at"
+  >("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // ✅ ウィッシュリスト検索の状態
-  const [searchTitle, setSearchTitle] = useState("");
-  const [hasSearched, setHasSearched] = useState(false);
-  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const loadWishlist = useCallback(async () => {
+    if (isAuthenticated && isInitialized) {
+      await fetchWishlist();
+    }
+  }, [isAuthenticated, isInitialized, fetchWishlist]);
 
-  // ✅ 書籍検索の処理（AddBookPageと同じ）
-  const handleSearchBooks = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTitle.trim()) {
-      alert("検索するタイトルを入力してください");
-      return;
+  useEffect(() => {
+    loadWishlist();
+  }, [loadWishlist]);
+
+  const filteredBooks = wishlistBooks.filter((book) => {
+    // 安全なアクセス：null/undefinedの場合は空文字に変換
+    const title = (book.title || "").toLowerCase();
+    const author = (book.author || "").toLowerCase();
+    const publisher = (book.publisher || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    return (
+      title.includes(query) ||
+      author.includes(query) ||
+      publisher.includes(query)
+    );
+  });
+
+  // ソート処理
+  const sortedBooks = [...filteredBooks].sort((a, b) => {
+    let aValue, bValue;
+
+    switch (sortBy) {
+      case "title":
+        aValue = (a.title || "").toLowerCase();
+        bValue = (b.title || "").toLowerCase();
+        break;
+      case "author":
+        aValue = (a.author || "").toLowerCase();
+        bValue = (b.author || "").toLowerCase();
+        break;
+      case "published_date":
+        aValue = new Date(a.published_date || 0).getTime();
+        bValue = new Date(b.published_date || 0).getTime();
+        break;
+      case "created_at":
+      default:
+        aValue = new Date(a.created_at || 0).getTime();
+        bValue = new Date(b.created_at || 0).getTime();
+        break;
     }
 
-    try {
-      await searchBooksByTitleForRegistration(searchTitle.trim());
-      setHasSearched(true);
-    } catch (error: any) {
-      console.error("検索エラー:", error);
-      alert("検索に失敗しました。再度お試しください。");
+    if (sortOrder === "asc") {
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    } else {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
+  });
+
+  // ジャンル推定関数
+  const getGenre = (book: any) => {
+    const title = book.title.toLowerCase();
+    if (title.includes("巻") || title.includes("vol") || title.includes("第")) {
+      return "漫画";
+    } else if (
+      title.includes("code") ||
+      title.includes("技術") ||
+      title.includes("programming")
+    ) {
+      return "技術書";
+    } else if (title.includes("小説") || title.includes("novel")) {
+      return "小説";
+    } else {
+      return "書籍";
     }
   };
 
-  // ✅ ウィッシュリストに追加する処理
-  const handleAddToWishlist = async (book: GoogleBookInfo) => {
-    if (!isAuthenticated) {
-      alert("ウィッシュリストに追加するにはログインが必要です");
-      navigate("/login");
-      return;
-    }
-
+  // ✅ ウィッシュリスト専用: 所有済みに変更する機能
+  const handleMarkAsOwned = async (bookId: number) => {
     try {
-      // ✅ GoogleBookInfoをバックエンドが期待する形式に変換
-      const bookData = {
-        title: book.title,
-        authors: book.authors || [],
-        publisher: book.publisher,
-        cover_image_url: book.cover_image_url,
-        published_date: book.published_date,
-      };
-
-      const registeredBook = await addToWishlist(bookData);
-      alert(`📚 「${registeredBook.title}」をウィッシュリストに追加しました！`);
-
-      // 検索状態をリセット
-      setSearchTitle("");
-      setHasSearched(false);
-      clearTitleSearchResults();
-      setImageErrors({});
-
-      // ウィッシュリスト一覧に遷移（実装されている場合）
-      // navigate("/book-list?filter=wishlist");
-    } catch (error: any) {
-      console.error("ウィッシュリスト追加エラー:", error);
-      alert(`❌ 追加に失敗しました: ${error.message}`);
+      await updateBookById(bookId, { status: BookStatusEnum.OWNED });
+      // 成功したらウィッシュリストを再取得して状態を更新
+      await loadWishlist();
+    } catch (error) {
+      console.error("所有済み変更エラー:", error);
     }
   };
 
-  // 未認証の場合のガード
+  // ✅ Amazon購入リンクを開く
+  const handleBuyOnAmazon = (book: any) => {
+    // バックエンドから返されるamazon_urlがある場合はそれを使用
+    if (book.amazon_url) {
+      window.open(book.amazon_url, "_blank", "noopener,noreferrer");
+    } else if (book.isbn) {
+      // ISBN10に変換してAmazonリンクを生成（簡易実装）
+      const amazonUrl = `https://www.amazon.co.jp/s?k=${encodeURIComponent(
+        book.isbn
+      )}`;
+      window.open(amazonUrl, "_blank", "noopener,noreferrer");
+    } else {
+      // ISBNがない場合はタイトルで検索
+      const amazonUrl = `https://www.amazon.co.jp/s?k=${encodeURIComponent(
+        book.title + " " + book.author
+      )}`;
+      window.open(amazonUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  // 未認証の場合の表示
   if (!isAuthenticated) {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <GlassCard className="p-12 text-center">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-purple-400/30 to-purple-500/30 backdrop-blur-sm rounded-3xl mb-8 shadow-xl">
-            <span className="text-4xl">💜</span>
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-pink-400/30 to-purple-500/30 backdrop-blur-sm rounded-3xl mb-8 shadow-xl">
+            <span className="text-4xl">💖</span>
           </div>
           <h1 className="text-3xl font-light text-gray-800 mb-6">
-            ウィッシュリストを利用するにはログインが必要です
+            ウィッシュリストを見るにはログインが必要です
           </h1>
           <p className="text-gray-600 mb-8 text-lg leading-relaxed">
-            アカウントにログインして欲しい書籍をウィッシュリストに追加しましょう
+            アカウントにログインして欲しい本リストを管理しましょう
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <GlassButton
-              variant="primary"
-              size="lg"
-              onClick={() => navigate("/login")}
-            >
-              ログイン
-            </GlassButton>
-            <GlassButton
-              variant="outline"
-              size="lg"
-              onClick={() => navigate("/signup")}
-            >
-              新規登録
-            </GlassButton>
+            <Link to="/login">
+              <GlassButton variant="primary" size="lg">
+                ログイン
+              </GlassButton>
+            </Link>
+            <Link to="/signup">
+              <GlassButton variant="outline" size="lg">
+                新規登録
+              </GlassButton>
+            </Link>
           </div>
         </GlassCard>
       </div>
@@ -123,266 +167,191 @@ export const WishlistPage = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* ヘッダー */}
-      <div className="text-center">
-        <h1 className="text-4xl font-light text-gray-800 mb-4">
-          💜 ウィッシュリスト
-        </h1>
-        <p className="text-gray-600 text-lg">
-          欲しい書籍を検索してウィッシュリストに追加しましょう
-        </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-light text-gray-800">
+              ウィッシュリスト
+            </h1>
+          </div>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <GlassInput
+                type="text"
+                placeholder="タイトル"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon="🔍"
+              />
+            </div>
+            <Link to="/search-books">
+              <GlassButton variant="primary">追加</GlassButton>
+            </Link>
+          </div>
+        </div>
+
+        {/* ソート・フィルター */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <span className="text-sm text-gray-600">並び替え:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-400/50"
+          >
+            <option value="created_at">追加日</option>
+            <option value="title">タイトル</option>
+            <option value="author">著者</option>
+            <option value="published_date">出版日</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 hover:bg-white/40 transition-colors"
+          >
+            {sortOrder === "asc" ? "↑" : "↓"}
+          </button>
+          <span className="text-sm text-gray-600 ml-2">
+            {sortedBooks.length}件の欲しい本
+          </span>
+        </div>
       </div>
 
-      {/* メイン検索カード */}
-      <GlassCard className="p-8">
-        <h2 className="text-2xl font-light text-gray-800 mb-6 flex items-center">
-          <span className="mr-3">🔍</span>
-          書籍検索
-        </h2>
-
-        {/* エラー表示 */}
-        {(error || wishlistError) && (
-          <GlassError message={error || wishlistError || ""} />
-        )}
-
-        {/* 検索フォーム */}
-        <form onSubmit={handleSearchBooks} className="space-y-6 mb-8">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              書籍タイトル <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <GlassInput
-                  type="text"
-                  value={searchTitle}
-                  onChange={(e) => setSearchTitle(e.target.value)}
-                  placeholder="ウィッシュリストに追加したい書籍のタイトルを入力"
-                  disabled={isTitleSearching}
-                />
-              </div>
-              {/* ✅ 入力リセットボタン */}
-              {searchTitle && (
-                <GlassButton
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTitle("");
-                    setHasSearched(false);
-                    clearTitleSearchResults();
-                    setImageErrors({});
-                  }}
-                  disabled={isTitleSearching}
-                  className="px-3"
-                >
-                  ✕
-                </GlassButton>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              例: 「ハリーポッター」「Python」「料理本」など
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4">
-            <GlassButton
-              variant="primary"
-              type="submit"
-              size="lg"
-              className="flex-1"
-              disabled={isTitleSearching || !searchTitle.trim()}
+      {/* ウィッシュリスト一覧 */}
+      {isLoadingWishlist ? (
+        <GlassLoading message="ウィッシュリストを読み込み中..." />
+      ) : wishlistFetchError ? (
+        <GlassError
+          message={wishlistFetchError}
+          onRetry={() => fetchWishlist()}
+        />
+      ) : sortedBooks.length === 0 ? (
+        <GlassEmptyState
+          icon={searchQuery ? "🔍" : "💖"}
+          title={
+            searchQuery
+              ? "検索結果が見つかりません"
+              : "ウィッシュリストが空です"
+          }
+          description={
+            searchQuery
+              ? "別のキーワードで検索してみてください"
+              : "欲しい本をウィッシュリストに追加してみましょう"
+          }
+          actionLabel={!searchQuery ? "最初の本を追加" : undefined}
+          onAction={
+            !searchQuery
+              ? () => (window.location.href = "/add-book")
+              : undefined
+          }
+        />
+      ) : (
+        <div className="space-y-4">
+          {sortedBooks.map((book) => (
+            <div
+              key={book.id}
+              className="bg-white/30 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group relative"
             >
-              {isTitleSearching ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  検索中...
-                </div>
-              ) : (
-                "🔍 書籍を検索"
-              )}
-            </GlassButton>
-
-            <GlassButton
-              type="button"
-              variant="secondary"
-              size="lg"
-              onClick={() => navigate("/book-list")}
-              disabled={isTitleSearching}
-            >
-              書籍一覧に戻る
-            </GlassButton>
-          </div>
-        </form>
-
-        {/* 検索結果 */}
-        {hasSearched && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-light text-gray-800">
-                「{searchTitle}」の検索結果 ({titleSearchResults.length}件)
-              </h3>
-              <GlassButton
-                variant="outline"
-                onClick={() => {
-                  setHasSearched(false);
-                  clearTitleSearchResults();
-                  setImageErrors({});
-                }}
-              >
-                結果をクリア
-              </GlassButton>
-            </div>
-
-            {titleSearchResults.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-gray-400/30 to-gray-500/30 backdrop-blur-sm rounded-3xl mb-8 shadow-xl">
-                  <span className="text-4xl">😔</span>
-                </div>
-                <h3 className="text-xl font-light text-gray-800 mb-4">
-                  検索結果が見つかりませんでした
-                </h3>
-                <p className="text-gray-600 mb-8 leading-relaxed max-w-md mx-auto">
-                  「{searchTitle}
-                  」に一致する書籍が見つかりませんでした。別のキーワードで検索してみてください。
-                </p>
-                <GlassButton
-                  variant="primary"
-                  onClick={() => {
-                    setHasSearched(false);
-                    clearTitleSearchResults();
-                  }}
-                >
-                  別のキーワードで検索
-                </GlassButton>
-              </div>
-            ) : (
-              <div className="grid gap-6">
-                {titleSearchResults.map(
-                  (book: GoogleBookInfo, index: number) => (
-                    <div
-                      key={index}
-                      className="bg-white/20 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:border-purple-400/50 transition-all duration-300 hover:shadow-xl group"
-                    >
-                      <div className="flex flex-col md:flex-row gap-4">
-                        {/* 書籍カバー */}
-                        <div className="flex-shrink-0">
-                          <img
-                            src={
-                              imageErrors[index] || !book.cover_image_url
-                                ? PLACEHOLDER_IMAGE
-                                : book.cover_image_url
-                            }
-                            alt={book.title}
-                            className="w-24 h-36 object-cover rounded-lg shadow-lg"
-                            onError={() => {
-                              if (!imageErrors[index]) {
-                                setImageErrors((prev) => ({
-                                  ...prev,
-                                  [index]: true,
-                                }));
-                              }
-                            }}
-                          />
-                        </div>
-
-                        {/* 書籍情報 */}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-lg font-medium text-gray-800 mb-2 line-clamp-2">
-                            {book.title}
-                          </h4>
-                          <div className="space-y-1 text-sm text-gray-600">
-                            <p>
-                              <span className="font-medium">著者:</span>{" "}
-                              {Array.isArray(book.author)
-                                ? book.author.join(", ")
-                                : book.author || "不明"}
-                            </p>
-                            <p>
-                              <span className="font-medium">出版社:</span>{" "}
-                              {book.publisher || "不明"}
-                            </p>
-                            <p>
-                              <span className="font-medium">出版日:</span>{" "}
-                              {book.published_date || "不明"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* ウィッシュリスト追加ボタン */}
-                        <div className="flex-shrink-0 flex items-center">
-                          <GlassButton
-                            variant="primary"
-                            onClick={() => handleAddToWishlist(book)}
-                            disabled={isRegisteringToWishlist}
-                            className="w-full md:w-auto bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                          >
-                            {isRegisteringToWishlist ? (
-                              <div className="flex items-center">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                追加中...
-                              </div>
-                            ) : (
-                              "💜 ウィッシュリストに追加"
-                            )}
-                          </GlassButton>
-                        </div>
-                      </div>
+              <div className="flex gap-4">
+                {/* ✅ 左側: カバー画像 */}
+                <div className="flex-shrink-0">
+                  <div className="relative w-20 h-28 overflow-hidden rounded-lg">
+                    <img
+                      src={book.cover_image_url || "/placeholder.svg"}
+                      alt={book.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        const fallback =
+                          target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove("hidden");
+                      }}
+                    />
+                    {/* フォールバック画像 */}
+                    <div className="hidden w-full h-full flex items-center justify-center bg-gray-200/50">
+                      <span className="text-2xl opacity-50">💖</span>
                     </div>
-                  )
-                )}
+                  </div>
+                </div>
+
+                {/* ✅ 右側: 書籍情報 */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-start justify-between mb-10">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-800 text-sm line-clamp-2 leading-tight">
+                        {book.title}
+                      </h3>
+                      <p className="text-xs text-gray-600 truncate mt-1">
+                        {book.author}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 追加日 */}
+                  <div className="text-xs text-gray-500">
+                    発売日:{" "}
+                    {book.published_date
+                      ? new Date(book.published_date).toLocaleDateString(
+                          "ja-JP"
+                        )
+                      : "発売日不明"}
+                  </div>
+
+                  {/* ✅ アクションボタン */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => handleBuyOnAmazon(book)}
+                      className="flex-1 bg-gradient-to-r from-orange-400/80 to-yellow-500/80 hover:from-orange-500/90 hover:to-yellow-600/90 text-white text-xs py-2 px-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-1"
+                    >
+                      🛒 Amazonで購入
+                    </button>
+                    <button
+                      onClick={() => handleMarkAsOwned(book.id)}
+                      className="flex-1 bg-white/20 hover:bg-gradient-to-r hover:from-green-500/90 hover:to-blue-600/90 text-gray-600 hover:text-white text-xs py-2 px-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-1 border-2 border-dashed border-gray-400/50 hover:border-transparent"
+                    >
+                      ☐ 本棚に移動
+                    </button>
+                    <button
+                      onClick={() => {
+                        window.location.href = `/books/${book.id}`;
+                      }}
+                      className="bg-white/20 hover:bg-white/30 text-gray-700 text-xs py-2 px-3 rounded-lg transition-all duration-300 border border-white/30"
+                    >
+                      📖
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
-      </GlassCard>
-
-      {/* ヘルプセクション */}
-      <GlassCard className="p-8">
-        <h3 className="text-2xl font-light text-gray-800 mb-6 flex items-center">
-          <span className="mr-3">💡</span>
-          ウィッシュリストについて
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl mb-4 shadow-lg">
-              <span className="text-2xl">🔍</span>
             </div>
-            <h4 className="font-medium text-gray-800 mb-2">書籍を検索</h4>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              欲しい書籍のタイトルで検索し、Google Books
-              APIから候補を表示します。
-            </p>
-          </div>
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-400/30 to-pink-500/30 backdrop-blur-sm rounded-2xl mb-4 shadow-lg">
-              <span className="text-2xl">💜</span>
-            </div>
-            <h4 className="font-medium text-gray-800 mb-2">
-              ウィッシュリストに追加
-            </h4>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              気になる書籍をウィッシュリストに追加して、後で購入検討できます。
-            </p>
-          </div>
+          ))}
         </div>
-      </GlassCard>
+      )}
 
-      {/* ✅ ウィッシュリスト追加中の全画面ローディング */}
-      {isRegisteringToWishlist && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <GlassCard className="p-8 max-w-md mx-4">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-6"></div>
-              <h3 className="text-xl font-light text-gray-800 mb-4">
-                💜 ウィッシュリストに追加しています...
+      {/* ✅ ウィッシュリスト専用のヘルプセクション */}
+      {sortedBooks.length > 0 && (
+        <GlassCard className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="text-2xl">💡</div>
+            <div>
+              <h3 className="font-medium text-gray-800 mb-2">
+                ウィッシュリストの使い方
               </h3>
-              <p className="text-gray-600 text-sm">
-                選択された書籍をウィッシュリストに追加中です
-              </p>
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>
+                  • 🛒 <strong>購入ボタン</strong>: Amazonで購入できます
+                </p>
+                <p>
+                  • ✅ <strong>購入済みボタン</strong>:
+                  所有している本リストに移動します
+                </p>
+                <p>
+                  • 📖 <strong>詳細を見る</strong>: 本の詳細情報を確認できます
+                </p>
+              </div>
             </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
       )}
     </div>
   );
