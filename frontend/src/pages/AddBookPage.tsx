@@ -13,6 +13,7 @@ import {
   GlassLoading,
 } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
+import { PLACEHOLDER_IMAGE } from "../constants/images";
 
 export const AddBookPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<
@@ -47,6 +48,8 @@ export const AddBookPage = () => {
   // ✅ 書籍検索の状態
   const [searchTitle, setSearchTitle] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   // ✅ バーコードスキャン成功時の処理
   const handleBarcodeSuccess = async (isbn: string) => {
@@ -101,6 +104,7 @@ export const AddBookPage = () => {
       setSearchTitle("");
       setHasSearched(false);
       clearTitleSearchResults();
+      setImageErrors({});
       setSelectedMethod(null);
 
       navigate("/book-list");
@@ -350,6 +354,7 @@ export const AddBookPage = () => {
                       setSearchTitle("");
                       setHasSearched(false);
                       clearTitleSearchResults();
+                      setImageErrors({});
                     }}
                     disabled={isTitleSearching}
                     className="px-3"
@@ -390,6 +395,7 @@ export const AddBookPage = () => {
                   setSearchTitle("");
                   setHasSearched(false);
                   clearTitleSearchResults();
+                  setImageErrors({});
                 }}
                 disabled={isTitleSearching}
               >
@@ -410,6 +416,7 @@ export const AddBookPage = () => {
                   onClick={() => {
                     setHasSearched(false);
                     clearTitleSearchResults();
+                    setImageErrors({});
                   }}
                 >
                   結果をクリア
@@ -459,14 +466,19 @@ export const AddBookPage = () => {
                           <div className="flex-shrink-0">
                             <img
                               src={
-                                book.cover_image_url ||
-                                "https://via.placeholder.com/120x180?text=No+Image"
+                                imageErrors[index] || !book.cover_image_url
+                                  ? PLACEHOLDER_IMAGE
+                                  : book.cover_image_url
                               }
                               alt={book.title}
                               className="w-24 h-36 object-cover rounded-lg shadow-lg"
-                              onError={(e) => {
-                                e.currentTarget.src =
-                                  "https://via.placeholder.com/120x180?text=No+Image";
+                              onError={() => {
+                                if (!imageErrors[index]) {
+                                  setImageErrors((prev) => ({
+                                    ...prev,
+                                    [index]: true,
+                                  }));
+                                }
                               }}
                             />
                           </div>
