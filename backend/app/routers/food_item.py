@@ -1,5 +1,8 @@
+import os
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
+import requests
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import food_item as crud_food
@@ -7,14 +10,12 @@ from app.models.food_item import FoodCategory
 from app.models.user import User
 from app.schemas.food_item import FoodItemCreate, FoodItemRead
 from app.services.hybrid_recipe import hybrid_recipe_suggestion
-from app.services.recipe_chatgpt import generate_recipe_focused_on_main_ingredient
+from app.services.recipe_chatgpt import \
+    generate_recipe_focused_on_main_ingredient
 from app.services.validate_category import validate_food_category
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-import os
-import requests
-from dotenv import load_dotenv
-from urllib.parse import urlencode
 
 router = APIRouter(prefix="/api", tags=["food_items"])
 
@@ -228,6 +229,12 @@ def update_food(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if not validate_food_category(food_update.name, food_update.category.value):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{food_update.name} は {food_update.category.value} に分類されません"
+        )
+
     return crud_food.update_food_item(db, food_id, food_update, current_user.id)
 
 
