@@ -1,4 +1,4 @@
-// src/stores/bookStore.ts
+// src/stores/bookStore.ts - 書籍検索登録機能追加版
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -23,6 +23,10 @@ interface BookStore {
   // ✅ 新規追加: バーコード関連の状態
   isRegisteringByISBN: boolean;
   lastScannedISBN: string | null;
+  // ✅ 新規追加: タイトル検索登録の状態
+  isRegisteringByTitle: boolean;
+  titleSearchResults: GoogleBookInfo[];
+  isTitleSearching: boolean;
 
   // ✅ 新機能: 認証関連エラーの状態
   lastAuthError: string | null;
@@ -46,6 +50,16 @@ interface BookStore {
   setRegisteringByISBN: (registering: boolean) => void;
   setLastScannedISBN: (isbn: string | null) => void;
   createBookByISBN: (isbn: string) => Promise<Book>;
+
+  // ✅ 新規追加: タイトル検索登録のアクション
+  setRegisteringByTitle: (registering: boolean) => void;
+  setTitleSearchResults: (results: GoogleBookInfo[]) => void;
+  setTitleSearching: (searching: boolean) => void;
+  clearTitleSearchResults: () => void;
+  searchBooksByTitleForRegistration: (
+    title: string
+  ) => Promise<GoogleBookInfo[]>;
+  createBookByTitle: (title: string) => Promise<Book>;
 
   // ✅ 新機能: 認証エラー管理
   setAuthError: (error: string | null) => void;
@@ -181,11 +195,15 @@ export const useBookStore = create<BookStore>()(
     searchResults: [],
     isSearching: false,
     selectedBook: null,
-    lastAuthError: null, // ✅ 新規追加
-    hasAuthError: false, // ✅ 新規追加
-    // ✅ 新規追加: バーコード関連の初期状態
+    lastAuthError: null,
+    hasAuthError: false,
+    // ✅ バーコード関連の初期状態
     isRegisteringByISBN: false,
     lastScannedISBN: null,
+    // ✅ 新規追加: タイトル検索登録の初期状態
+    isRegisteringByTitle: false,
+    titleSearchResults: [],
+    isTitleSearching: false,
 
     setBooks: (books) => set({ books }),
     addBook: (book) => set((state) => ({ books: [...state.books, book] })),
@@ -211,76 +229,66 @@ export const useBookStore = create<BookStore>()(
       return books.find((b) => b.id === id) || null;
     },
 
-    // ✅ 新規追加: バーコード関連のアクション
+    // ✅ バーコード関連のアクション
     setRegisteringByISBN: (registering) =>
       set({ isRegisteringByISBN: registering }),
 
     setLastScannedISBN: (isbn) => set({ lastScannedISBN: isbn }),
+
+    // ✅ 新規追加: タイトル検索登録のアクション
+    setRegisteringByTitle: (registering) =>
+      set({ isRegisteringByTitle: registering }),
+
+    setTitleSearchResults: (results) => set({ titleSearchResults: results }),
+
+    setTitleSearching: (searching) => set({ isTitleSearching: searching }),
+
+    clearTitleSearchResults: () => set({ titleSearchResults: [] }),
 
     // ✅ 新機能: 認証エラー管理
     setAuthError: (error) =>
       set({ lastAuthError: error, hasAuthError: !!error }),
     clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
 
-    // ✅ 改良版: 書籍一覧取得（認証エラー処理強化）
+    // 既存の関数（変更なし）
     fetchBooks: async () => {
       set({ isLoading: true, error: null });
       try {
         const response = await axios.get(`${API_BASE_URL}/me/books`);
         set({ books: response.data, isLoading: false });
-
-        // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
       } catch (err: any) {
         console.error("書籍取得エラー:", err);
-
         const { message, isAuthError } = formatErrorMessage(err);
-
         if (isAuthError) {
-          // ✅ 認証エラーの場合
           get().setAuthError(message);
-          // Axiosインターセプターが自動でAuthStoreを処理するため、
-          // ここではエラーメッセージを設定しない
           set({ isLoading: false });
         } else {
-          // ✅ 通常のエラーの場合
-          set({
-            error: message,
-            isLoading: false,
-            books: [],
-          });
+          set({ error: message, isLoading: false, books: [] });
         }
       }
     },
 
-    // ✅ 改良版: 書籍詳細取得（認証エラー処理強化）
     fetchBookById: async (id: number) => {
       set({ isLoading: true, error: null });
       try {
         const response = await axios.get(`${API_BASE_URL}/books/${id}`);
         set({ isLoading: false });
-
-        // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
         return response.data;
       } catch (err: any) {
         console.error("書籍詳細取得エラー:", err);
-
         const { message, isAuthError } = formatErrorMessage(err);
-
         if (isAuthError) {
-          // ✅ 認証エラーの場合
           get().setAuthError(message);
           set({ isLoading: false });
         } else {
-          // ✅ 通常のエラーの場合
           set({ error: message, isLoading: false });
         }
         return null;
       }
     },
 
-    // ✅ 改良版: 書籍作成（認証エラー処理強化）
     createBook: async (bookData) => {
       set({ isLoading: true, error: null });
       try {
@@ -289,31 +297,22 @@ export const useBookStore = create<BookStore>()(
           books: [...state.books, response.data],
           isLoading: false,
         }));
-
-        // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
       } catch (err: any) {
         console.error("書籍作成エラー:", err);
-
         const { message, isAuthError } = formatErrorMessage(err);
-
         if (isAuthError) {
-          // ✅ 認証エラーの場合
           get().setAuthError(message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
-          // ✅ 通常のエラーの場合
-          set({
-            error: message,
-            isLoading: false,
-          });
+          set({ error: message, isLoading: false });
           throw new Error(message);
         }
       }
     },
 
-    // ✅ 新規追加: ISBNによる書籍登録機能
+    // ✅ ISBNによる書籍登録機能
     createBookByISBN: async (isbn: string) => {
       set({
         isRegisteringByISBN: true,
@@ -322,12 +321,9 @@ export const useBookStore = create<BookStore>()(
       });
 
       try {
-        // 実際のバックエンドAPIを使用
         const response = await axios.post(
           `${API_BASE_URL}/books/register-by-isbn`,
-          {
-            isbn,
-          }
+          { isbn }
         );
 
         const registeredBook = response.data.book || response.data;
@@ -337,32 +333,86 @@ export const useBookStore = create<BookStore>()(
           isRegisteringByISBN: false,
         }));
 
-        // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
-
         return registeredBook;
       } catch (err: any) {
         console.error("❌ ISBN書籍登録エラー:", err);
-
         const { message, isAuthError } = formatErrorMessage(err);
-
         if (isAuthError) {
-          // ✅ 認証エラーの場合
           get().setAuthError(message);
           set({ isRegisteringByISBN: false });
           throw new Error("認証が必要です。再度ログインしてください。");
         } else {
-          // ✅ 通常のエラーの場合
-          set({
-            error: message,
-            isRegisteringByISBN: false,
-          });
+          set({ error: message, isRegisteringByISBN: false });
           throw new Error(message);
         }
       }
     },
 
-    // ✅ 改良版: 書籍更新（認証エラー処理強化）
+    // ✅ 新機能: タイトル検索（登録用）
+    searchBooksByTitleForRegistration: async (title: string) => {
+      set({ isTitleSearching: true, error: null });
+      try {
+        const response = await axios.get(`${API_BASE_URL}/search_book`, {
+          params: { title },
+        });
+        const results = response.data;
+        set({
+          titleSearchResults: results,
+          isTitleSearching: false,
+        });
+        return results;
+      } catch (err: any) {
+        const { message } = formatErrorMessage(err);
+        console.error("書籍検索エラー:", err);
+        set({
+          error: message,
+          isTitleSearching: false,
+          titleSearchResults: [],
+        });
+        return [];
+      }
+    },
+
+    // ✅ 新機能: タイトルによる書籍登録
+    createBookByTitle: async (title: string) => {
+      set({
+        isRegisteringByTitle: true,
+        error: null,
+      });
+
+      try {
+        const response = await axios.post(
+          `${API_BASE_URL}/books/register-by-title`,
+          null,
+          {
+            params: { title },
+          }
+        );
+
+        const registeredBook = response.data;
+
+        set((state) => ({
+          books: [...state.books, registeredBook],
+          isRegisteringByTitle: false,
+        }));
+
+        get().clearAuthError();
+        return registeredBook;
+      } catch (err: any) {
+        console.error("❌ タイトル書籍登録エラー:", err);
+        const { message, isAuthError } = formatErrorMessage(err);
+        if (isAuthError) {
+          get().setAuthError(message);
+          set({ isRegisteringByTitle: false });
+          throw new Error("認証が必要です。再度ログインしてください。");
+        } else {
+          set({ error: message, isRegisteringByTitle: false });
+          throw new Error(message);
+        }
+      }
+    },
+
     updateBookById: async (id: number, updateData: BookUpdate) => {
       set({ isLoading: true, error: null });
       try {
@@ -370,31 +420,19 @@ export const useBookStore = create<BookStore>()(
           `${API_BASE_URL}/books/${id}`,
           updateData
         );
-
-        // ローカル状態を更新
         const { updateBook } = get();
         updateBook(response.data);
-
         set({ isLoading: false });
-
-        // ✅ 成功時は認証エラー状態をクリア
         get().clearAuthError();
       } catch (err: any) {
         console.error("書籍更新エラー:", err);
-
         const { message, isAuthError } = formatErrorMessage(err);
-
         if (isAuthError) {
-          // ✅ 認証エラーの場合
           get().setAuthError(message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
-          // ✅ 通常のエラーの場合
-          set({
-            error: message,
-            isLoading: false,
-          });
+          set({ error: message, isLoading: false });
           throw new Error(message);
         }
       }
@@ -408,7 +446,6 @@ export const useBookStore = create<BookStore>()(
       } catch (err: any) {
         const { message } = formatErrorMessage(err);
         console.error("ISBN検索エラー:", err);
-
         set({ error: message });
         return null;
       }
@@ -425,7 +462,6 @@ export const useBookStore = create<BookStore>()(
       } catch (err: any) {
         const { message } = formatErrorMessage(err);
         console.error("書籍検索エラー:", err);
-
         set({
           error: message,
           isSearching: false,

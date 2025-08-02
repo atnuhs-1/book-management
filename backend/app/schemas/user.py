@@ -31,9 +31,15 @@ class TokenWithUser(BaseModel):
 class UpdateUserRequest(BaseModel):
     username: Optional[str]
     email: Optional[EmailStr]
-    full_name: Optional[str]
 
 
 class ChangePasswordRequest(BaseModel):
     current_password: Annotated[str, StringConstraints(min_length=6)]
+    new_password: Annotated[str, StringConstraints(min_length=6)]
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
     new_password: Annotated[str, StringConstraints(min_length=6)]

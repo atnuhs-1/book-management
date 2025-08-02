@@ -18,7 +18,15 @@ class FoodCategory(str, Enum):
 # ✅ 単位（新しく追加）
 class QuantityUnit(str, Enum):
     GRAM = "g"
+    KILOGRAM = "kg"
+    LITER = "L"
+    MILLILITER = "ml"
     PIECE = "個"
+    BOTTLE = "本"
+    BAG = "袋"
+    CAN = "缶"
+    BOX = "箱"
+    PACK = "パック"
 
 # ベーススキーマ
 class FoodItemBase(BaseModel):
