@@ -3,6 +3,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
 
+from typing import Optional
 
 # カテゴリ
 class FoodCategory(str, Enum):
@@ -12,6 +13,7 @@ class FoodCategory(str, Enum):
     SEASONINGS = "調味料"
     FROZEN = "冷凍食品"
     SNACKS = "お菓子"
+   #  OTHER = "その他"
 
 # ✅ 単位（新しく追加）
 class QuantityUnit(str, Enum):
@@ -29,7 +31,7 @@ class QuantityUnit(str, Enum):
 # ベーススキーマ
 class FoodItemBase(BaseModel):
     name: str
-    category: FoodCategory
+    category: Optional[FoodCategory] = None #これにする
     quantity: int = Field(..., description="1以上の数量を入力してください")
     unit: QuantityUnit  # ✅ 単位を追加
     expiration_date: date

@@ -165,8 +165,18 @@ export const LoginPage = () => {
                   disabled={isLoading}
                 >
                   {showPassword ? "🙈" : "👁️"}
-                </button>
+                </button>  
               </div>
+              <p className="text-sm text-gray-600 mt-2">
+                  パスワードをお忘れの方は
+                  <Link
+                    to="/forgot-password"
+                    className="text-indigo-600 underline hover:text-indigo-800 ml-1"
+                  >
+                    こちらから再設定
+                  </Link>
+                  できます。
+                </p>
               {formErrors.password && (
                 <p className="mt-1 text-sm text-red-600">
                   {formErrors.password}
