@@ -84,7 +84,17 @@ def register_book_by_title(
         raise HTTPException(status_code=404, detail=f"Google Booksに '{title}' の書籍が見つかりませんでした")
 
     # ✅ 最初の検索結果を採用（候補数が多ければ拡張可）
-    book_data = books[0]
+    # ✅ 入力されたタイトルとnormalizeして一致する本を探す
+    normalized_input = normalize_title(title)
+    matched_book = next(
+        (book for book in books if normalize_title(book["title"]) == normalized_input),
+        None
+    )
+
+    if not matched_book:
+        raise HTTPException(status_code=404, detail=f"'{title}' に完全一致する書籍が見つかりませんでした")
+
+    book_data = matched_book
 
     # ✅ ISBN補完（必要であれば楽天APIを使用）
     try:
