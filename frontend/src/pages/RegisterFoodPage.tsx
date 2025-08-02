@@ -7,7 +7,6 @@ import {
   GlassInput,
   GlassButton,
   GlassError,
-  GlassLoading,
 } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
 import { useAuthStore } from "../stores/authStore";
@@ -16,29 +15,35 @@ import type {
   FoodCreate,
   FoodCategory,
   FoodUnit,
-  BarcodeValidationResult,
 } from "../types/food";
 import {
   suggestCategoryFromName,
   calculateDefaultExpirationDate,
   validateFoodData,
 } from "../utils/foodUtils";
+import type { BarcodeValidationResult } from "../utils/barcodeValidator";
 
-const foodCategories = [
-  { id: "野菜・きのこ類", name: "野菜・きのこ類" },
-  { id: "果物", name: "果物" },
-  { id: "精肉", name: "精肉" },
-  { id: "魚介類", name: "魚介類" },
-  { id: "卵・乳製品", name: "卵・乳製品" },
-  { id: "冷凍食品", name: "冷凍食品" },
-  { id: "レトルト・缶詰", name: "レトルト・缶詰" },
-  { id: "ハム・ソーセージ類", name: "ハム・ソーセージ類" },
-  { id: "惣菜", name: "惣菜" },
-  { id: "お菓子", name: "お菓子" },
-  { id: "米、パン、麺", name: "米、パン、麺" },
-  { id: "調味料", name: "調味料" },
-  { id: "飲料", name: "飲料" },
-  { id: "その他", name: "その他" },
+interface FoodCategoryItem {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+const foodCategories: FoodCategoryItem[] = [
+  { id: "野菜・きのこ類", name: "野菜・きのこ類", icon: "🥬" },
+  { id: "果物", name: "果物", icon: "🍎" },
+  { id: "精肉", name: "精肉", icon: "🥩" },
+  { id: "魚介類", name: "魚介類", icon: "🐟" },
+  { id: "卵・乳製品", name: "卵・乳製品", icon: "🥛" },
+  { id: "冷凍食品", name: "冷凍食品", icon: "🧊" },
+  { id: "レトルト・缶詰", name: "レトルト・缶詰", icon: "🥫" },
+  { id: "ハム・ソーセージ類", name: "ハム・ソーセージ類", icon: "🌭" },
+  { id: "惣菜", name: "惣菜", icon: "🍱" },
+  { id: "お菓子", name: "お菓子", icon: "🍪" },
+  { id: "米、パン、麺", name: "米、パン、麺", icon: "🍞" },
+  { id: "調味料", name: "調味料", icon: "🧂" },
+  { id: "飲料", name: "飲料", icon: "🥤" },
+  { id: "その他", name: "その他", icon: "📦" },
 ];
 
 // ✅ 新規追加: 食品単位の選択肢
@@ -67,7 +72,7 @@ type FoodItem = {
 
 
 export const RegisterFoodPage = () => {
-  const { token, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const [forceConfirmVisible, setForceConfirmVisible] = useState(false);
   const [pendingFoodData, setPendingFoodData] = useState<FoodCreate | null>(null);
@@ -88,16 +93,8 @@ export const RegisterFoodPage = () => {
     quantity: "1",
     unit: "個", // ✅ デフォルト単位を設定
   });
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  // const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false); // ✅ 単位選択モーダル用
-
-  // ✅ 新機能: バーコードから検出した商品情報の一時保存
-  const [detectedProduct, setDetectedProduct] = useState<{
-    name: string;
-    category: FoodCategory;
-    barcode: string;
-    barcode_type: "JAN" | "EAN";
-  } | null>(null);
 
   // ✅ 未認証の場合のガード
   if (!isAuthenticated) {
@@ -160,12 +157,19 @@ export const RegisterFoodPage = () => {
       // 現在は登録完了後にモード選択に戻る
       setMode(null);
       setFood({ quantity: "1", unit: "個" });
-      setDetectedProduct(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("食品登録エラー:", error);
 
+      // エラーメッセージの取得
+      let errorMessage = "登録に失敗しました";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
       // エラーの種類に応じた対応
-      if (error.message.includes("商品情報が見つかりませんでした")) {
+      if (errorMessage.includes("商品情報が見つかりませんでした")) {
         // 商品情報が見つからない場合は手動入力に誘導
         const shouldManualInput = confirm(
           `商品情報が見つかりませんでした。\nバーコード: ${result.formattedCode}\n\n手動入力で追加しますか？`
@@ -185,7 +189,7 @@ export const RegisterFoodPage = () => {
         }
       } else {
         // その他のエラー
-        alert(`❌ 登録に失敗しました: ${error.message}`);
+        alert(`❌ 登録に失敗しました: ${errorMessage}`);
 
         const shouldRetry = confirm("手動入力で食品を追加しますか？");
         if (shouldRetry) {
@@ -203,7 +207,7 @@ export const RegisterFoodPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     if (
       !food.name ||
       !food.category ||
@@ -215,7 +219,7 @@ export const RegisterFoodPage = () => {
       setError("すべての項目を正しく入力してください");
       return;
     }
-  
+
     const foodData: FoodCreate = {
       name: food.name.trim(),
       category: food.category as FoodCategory,
@@ -225,33 +229,37 @@ export const RegisterFoodPage = () => {
       barcode: food.barcode,
       barcode_type: food.barcode_type,
     };
-  
+
     const validation = validateFoodData(foodData);
     if (!validation.isValid) {
       setError(`入力エラー:\n${validation.errors.join("\n")}`);
       return;
     }
-  
+
     try {
       await createFood(foodData); // 通常登録
       alert("食品を登録しました！");
       setFood({ quantity: "1", unit: "個" });
       setMode(null);
-      setDetectedProduct(null);
-    } catch (err: any) {
-      if (err.message.includes("分類されません")) {
+    } catch (error) {
+      // エラーメッセージの取得
+      let errorMessage = "登録に失敗しました";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      if (errorMessage.includes("分類されません")) {
         setPendingFoodData(foodData);
         setForceConfirmVisible(true); // 確認モーダル表示
       } else {
-        console.error("食品登録エラー:", err);
-        alert("登録に失敗しました: " + err.message);
+        console.error("食品登録エラー:", error);
+        alert("登録に失敗しました: " + errorMessage);
       }
     }
   };
-  
-  
 
-  const selectedCategory = foodCategories.find((c) => c.id === food.category);
   const selectedUnit = foodUnits.find((u) => u.id === food.unit); // ✅ 選択された単位
 
   return (
@@ -477,7 +485,6 @@ export const RegisterFoodPage = () => {
                 onClick={() => {
                   setFood({ quantity: "1", unit: "個" }); // ✅ unit もリセット
                   setMode(null);
-                  setDetectedProduct(null);
                 }}
                 disabled={isLoading}
               >
@@ -489,7 +496,7 @@ export const RegisterFoodPage = () => {
       )}
 
       {/* カテゴリ選択モーダル */}
-      {showCategoryModal && (
+      {/* {showCategoryModal && (
         <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-medium text-gray-800 text-center mb-2">
@@ -530,7 +537,7 @@ export const RegisterFoodPage = () => {
             </button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* ✅ 新規追加: 単位選択モーダル */}
       {showUnitModal && (
@@ -693,8 +700,8 @@ export const RegisterFoodPage = () => {
               ⚠️ カテゴリ外の食品です
             </h2>
             <p className="text-sm text-gray-700 text-center whitespace-pre-line">
-              {pendingFoodData.name} は {pendingFoodData.category} に分類されませんが、
-              登録を続行しますか？
+              {pendingFoodData.name} は {pendingFoodData.category}{" "}
+              に分類されませんが、 登録を続行しますか？
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <GlassButton
@@ -705,11 +712,14 @@ export const RegisterFoodPage = () => {
                     alert("⚠️ カテゴリ外ですが登録しました！");
                     setFood({ quantity: "1", unit: "個" });
                     setMode(null);
-                    setDetectedProduct(null);
                     setForceConfirmVisible(false);
                     setPendingFoodData(null);
-                  } catch (e: any) {
-                    alert("強制登録に失敗しました: " + e.message);
+                  } catch (error) {
+                    const errorMessage =
+                      error instanceof Error
+                        ? error.message
+                        : "強制登録に失敗しました";
+                    alert("強制登録に失敗しました: " + errorMessage);
                     setForceConfirmVisible(false);
                     setPendingFoodData(null);
                   }
@@ -728,9 +738,8 @@ export const RegisterFoodPage = () => {
               </GlassButton>
             </div>
           </div>
-  </div>
-)}
-
+        </div>
+      )}
     </div>
   );
 };

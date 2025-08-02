@@ -1,4 +1,4 @@
-// frontend/src/pages/SearchBooksPage.tsx - 書籍検索・登録・ウィッシュリスト統合ページ
+// frontend/src/pages/SearchBooksPage.tsx - errorFormatter対応版
 
 import { useState } from "react";
 import { useBookStore } from "../stores/bookStore";
@@ -13,8 +13,15 @@ import {
 } from "../components/ui/GlassUI";
 import { PLACEHOLDER_IMAGE } from "../constants/images";
 
+// ✅ errorFormatterをインポート
+import {
+  formatBookError,
+  categorizeError,
+  logError,
+} from "../utils/errorFormatter";
+
 export const SearchBooksPage = () => {
-  // ✅ bookStoreから必要な機能を取得
+  // bookStoreから必要な機能を取得
   const {
     searchBooksByTitleForRegistration,
     createBookByTitle,
@@ -31,81 +38,216 @@ export const SearchBooksPage = () => {
   const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
-  // ✅ 検索とUI状態管理
+  // 検索とUI状態管理
   const [searchTitle, setSearchTitle] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
-  // ✅ 書籍検索の処理
+  // ✅ ローカルエラー状態の追加
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [wishlistAddError, setWishlistAddError] = useState<string | null>(null);
+
+  // ✅ 改善された書籍検索処理
   const handleSearchBooks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchTitle.trim()) {
-      alert("検索するタイトルを入力してください");
+      setSearchError("検索するタイトルを入力してください");
       return;
     }
+
+    // エラー状態をクリア
+    setSearchError(null);
 
     try {
       await searchBooksByTitleForRegistration(searchTitle.trim());
       setHasSearched(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("検索エラー:", error);
-      alert("検索に失敗しました。再度お試しください。");
+
+      // ✅ errorFormatterを使用した詳細エラーハンドリング
+      const errorResult = formatBookError(error);
+      const category = categorizeError(error);
+      logError(error, "SearchBooksPage.handleSearchBooks");
+
+      // エラーの種類に応じたメッセージ表示
+      let userMessage = errorResult.message;
+
+      if (category.type === "network") {
+        userMessage =
+          "インターネット接続を確認してください。検索を再試行できます。";
+      } else if (category.type === "server") {
+        userMessage =
+          "サーバーで問題が発生しています。しばらく待ってから再試行してください。";
+      } else if (category.severity === "high") {
+        userMessage = `検索に失敗しました: ${errorResult.message}`;
+      }
+
+      setSearchError(userMessage);
+
+      // リトライ可能なエラーの場合は自動リトライのオプション表示
+      if (category.retryable) {
+        // UIでリトライボタンを表示するためのフラグなど
+        console.log("リトライ可能なエラー:", category.action);
+      }
     }
   };
 
-  // ✅ 書籍を登録（所有書籍として）
+  // ✅ 改善された書籍登録処理
   const handleRegisterBook = async (selectedTitle: string) => {
     if (!isAuthenticated) {
-      alert("書籍を登録するにはログインが必要です");
-      navigate("/login");
+      setRegisterError("書籍を登録するにはログインが必要です");
+      setTimeout(() => navigate("/login"), 2000);
       return;
     }
+
+    // エラー状態をクリア
+    setRegisterError(null);
 
     try {
       const registeredBook = await createBookByTitle(selectedTitle);
-      alert(`📚 「${registeredBook.title}」を所有書籍として登録しました！`);
 
-      // 成功時の処理は継続（検索結果はクリアしない）
-    } catch (error: any) {
+      // ✅ 成功時の改善されたフィードバック
+      const successMessage = `📚 「${registeredBook.title}」を所有書籍として登録しました！`;
+
+      // より良いUX: アラートの代わりにトースト通知などを使用
+      // showSuccessToast(successMessage);
+      alert(successMessage); // 一時的にアラートを使用
+
+      // 成功後の状態管理
+      setRegisterError(null);
+    } catch (error: unknown) {
       console.error("書籍登録エラー:", error);
-      alert(`❌ 登録に失敗しました: ${error.message}`);
+
+      // ✅ errorFormatterを使用した詳細エラーハンドリング
+      const errorResult = formatBookError(error);
+      const category = categorizeError(error);
+      logError(error, "SearchBooksPage.handleRegisterBook");
+
+      // 認証エラーの特別処理
+      if (errorResult.isAuthError) {
+        setRegisterError(
+          "セッションが期限切れです。再度ログインしてください。"
+        );
+        setTimeout(() => navigate("/login"), 2000);
+        return;
+      }
+
+      // エラーカテゴリに応じたメッセージ
+      let userMessage = errorResult.message;
+
+      if (category.type === "validation") {
+        userMessage = `登録データに問題があります: ${errorResult.message}`;
+      } else if (category.type === "server") {
+        userMessage =
+          "サーバーエラーが発生しました。しばらく待ってから再試行してください。";
+      } else if (errorResult.status === 409) {
+        userMessage = "この書籍は既に登録されています。";
+      }
+
+      setRegisterError(userMessage);
+
+      // 重要なエラーの場合はアラートも表示
+      if (category.severity === "high") {
+        alert(`❌ 登録に失敗しました: ${userMessage}`);
+      }
     }
   };
 
-  // ✅ ウィッシュリストに追加
+  // ✅ 改善されたウィッシュリスト追加処理
   const handleAddToWishlist = async (book: GoogleBookInfo) => {
     if (!isAuthenticated) {
-      alert("ウィッシュリストに追加するにはログインが必要です");
-      navigate("/login");
+      setWishlistAddError("ウィッシュリストに追加するにはログインが必要です");
+      setTimeout(() => navigate("/login"), 2000);
       return;
     }
 
+    // エラー状態をクリア
+    setWishlistAddError(null);
+
     try {
-      // GoogleBookInfoをバックエンドが期待する形式に変換
-      const bookData = {
-        title: book.title,
-        authors: book.authors || [],
-        publisher: book.publisher,
-        cover_image_url: book.cover_image_url,
-        published_date: book.published_date,
-      };
+      const registeredBook = await addToWishlist(book);
 
-      const registeredBook = await addToWishlist(bookData);
-      alert(`💜 「${registeredBook.title}」をウィッシュリストに追加しました！`);
+      // ✅ 成功時の改善されたフィードバック
+      const successMessage = `💜 「${registeredBook.title}」をウィッシュリストに追加しました！`;
 
-      // 成功時の処理は継続（検索結果はクリアしない）
-    } catch (error: any) {
+      // showSuccessToast(successMessage);
+      alert(successMessage); // 一時的にアラートを使用
+
+      setWishlistAddError(null);
+    } catch (error: unknown) {
       console.error("ウィッシュリスト追加エラー:", error);
-      alert(`❌ 追加に失敗しました: ${error.message}`);
+
+      // ✅ errorFormatterを使用した詳細エラーハンドリング
+      const errorResult = formatBookError(error);
+      const category = categorizeError(error);
+      logError(error, "SearchBooksPage.handleAddToWishlist");
+
+      // 認証エラーの特別処理
+      if (errorResult.isAuthError) {
+        setWishlistAddError(
+          "セッションが期限切れです。再度ログインしてください。"
+        );
+        setTimeout(() => navigate("/login"), 2000);
+        return;
+      }
+
+      // エラーカテゴリに応じたメッセージ
+      let userMessage = errorResult.message;
+
+      if (category.type === "validation") {
+        userMessage = `書籍データに問題があります: ${errorResult.message}`;
+      } else if (category.type === "server") {
+        userMessage =
+          "サーバーエラーが発生しました。しばらく待ってから再試行してください。";
+      } else if (errorResult.status === 409) {
+        userMessage = "この書籍は既にウィッシュリストに追加されています。";
+      }
+
+      setWishlistAddError(userMessage);
+
+      // 重要なエラーの場合はアラートも表示
+      if (category.severity === "high") {
+        alert(`❌ 追加に失敗しました: ${userMessage}`);
+      }
     }
   };
 
-  // ✅ 検索状態をリセット
+  // ✅ エラー状態をクリアする関数
+  const clearErrors = () => {
+    setSearchError(null);
+    setRegisterError(null);
+    setWishlistAddError(null);
+  };
+
+  // 検索状態をリセット
   const handleResetSearch = () => {
     setSearchTitle("");
     setHasSearched(false);
     clearTitleSearchResults();
     setImageErrors({});
+    clearErrors(); // ✅ エラー状態もクリア
+  };
+
+  // ✅ 統合されたエラー表示関数
+  const renderErrors = () => {
+    const errors = [
+      error,
+      wishlistError,
+      searchError,
+      registerError,
+      wishlistAddError,
+    ].filter(Boolean);
+
+    if (errors.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        {errors.map((errorMsg, index) => (
+          <GlassError key={index} message={errorMsg!} onRetry={clearErrors} />
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -117,10 +259,8 @@ export const SearchBooksPage = () => {
           書籍検索
         </h2>
 
-        {/* エラー表示 */}
-        {(error || wishlistError) && (
-          <GlassError message={error || wishlistError || ""} />
-        )}
+        {/* ✅ 改善されたエラー表示 */}
+        {renderErrors()}
 
         {/* 検索フォーム */}
         <form onSubmit={handleSearchBooks} className="space-y-6 mb-8">
@@ -133,7 +273,11 @@ export const SearchBooksPage = () => {
                 <GlassInput
                   type="text"
                   value={searchTitle}
-                  onChange={(e) => setSearchTitle(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTitle(e.target.value);
+                    // ✅ 入力時にエラーをクリア
+                    if (searchError) setSearchError(null);
+                  }}
                   placeholder="検索したい書籍のタイトルを入力"
                   disabled={isTitleSearching}
                 />
@@ -186,7 +330,34 @@ export const SearchBooksPage = () => {
           </div>
         </form>
 
-        {/* 検索結果 */}
+        {/* ✅ 検索エラーの場合のリトライボタン */}
+        {searchError && (
+          <div className="mb-6 p-4 bg-yellow-50/50 backdrop-blur-sm rounded-xl border border-yellow-200/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="text-yellow-600 mr-2">⚠️</span>
+                <span className="text-yellow-800 text-sm">
+                  検索でエラーが発生しました
+                </span>
+              </div>
+              <GlassButton
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchError(null);
+                  handleSearchBooks({
+                    preventDefault: () => {},
+                  } as React.FormEvent);
+                }}
+                disabled={isTitleSearching}
+              >
+                🔄 再試行
+              </GlassButton>
+            </div>
+          </div>
+        )}
+
+        {/* 検索結果（既存のコードと同じ） */}
         {hasSearched && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -199,13 +370,35 @@ export const SearchBooksPage = () => {
                   setHasSearched(false);
                   clearTitleSearchResults();
                   setImageErrors({});
+                  clearErrors(); // ✅ エラー状態もクリア
                 }}
               >
                 結果をクリア
               </GlassButton>
             </div>
 
+            {/* ✅ 個別のエラー表示も追加 */}
+            {(registerError || wishlistAddError) && (
+              <div className="space-y-2">
+                {registerError && (
+                  <div className="p-3 bg-red-50/50 backdrop-blur-sm rounded-lg border border-red-200/30">
+                    <span className="text-red-800 text-sm">
+                      📚 登録エラー: {registerError}
+                    </span>
+                  </div>
+                )}
+                {wishlistAddError && (
+                  <div className="p-3 bg-purple-50/50 backdrop-blur-sm rounded-lg border border-purple-200/30">
+                    <span className="text-purple-800 text-sm">
+                      💜 ウィッシュリストエラー: {wishlistAddError}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {titleSearchResults.length === 0 ? (
+              // 検索結果なしの表示（既存と同じ）
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-gray-400/30 to-gray-500/30 backdrop-blur-sm rounded-3xl mb-8 shadow-xl">
                   <span className="text-4xl">😔</span>
@@ -222,12 +415,14 @@ export const SearchBooksPage = () => {
                   onClick={() => {
                     setHasSearched(false);
                     clearTitleSearchResults();
+                    clearErrors();
                   }}
                 >
                   別のキーワードで検索
                 </GlassButton>
               </div>
             ) : (
+              // 検索結果の表示（既存のコードと同じ）
               <div className="grid gap-6">
                 {titleSearchResults.map(
                   (book: GoogleBookInfo, index: number) => (
@@ -235,6 +430,7 @@ export const SearchBooksPage = () => {
                       key={index}
                       className="bg-white/20 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:border-blue-400/50 transition-all duration-300 hover:shadow-xl group"
                     >
+                      {/* 書籍カードの内容は既存と同じ */}
                       <div className="flex flex-col lg:flex-row gap-4">
                         {/* 書籍カバー */}
                         <div className="flex-shrink-0">
@@ -285,7 +481,11 @@ export const SearchBooksPage = () => {
                           {/* 書籍登録ボタン */}
                           <GlassButton
                             variant="primary"
-                            onClick={() => handleRegisterBook(book.title)}
+                            onClick={() => {
+                              // ✅ エラー状態をクリアしてから実行
+                              setRegisterError(null);
+                              handleRegisterBook(book.title);
+                            }}
                             disabled={
                               isRegisteringByTitle || isRegisteringToWishlist
                             }
@@ -307,7 +507,11 @@ export const SearchBooksPage = () => {
                           {/* ウィッシュリスト追加ボタン */}
                           <GlassButton
                             variant="primary"
-                            onClick={() => handleAddToWishlist(book)}
+                            onClick={() => {
+                              // ✅ エラー状態をクリアしてから実行
+                              setWishlistAddError(null);
+                              handleAddToWishlist(book);
+                            }}
                             disabled={
                               isRegisteringByTitle || isRegisteringToWishlist
                             }

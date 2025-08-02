@@ -3,10 +3,14 @@
 // バックエンドのスキーマに対応した型定義
 
 // ✅ 書籍ステータスの列挙型
-export enum BookStatusEnum {
-  OWNED = "OWNED",
-  WISHLIST = "WISHLIST",
-}
+// ✅ 書籍ステータスの定数オブジェクト
+export const BookStatusEnum = {
+  OWNED: "OWNED",
+  WISHLIST: "WISHLIST",
+} as const;
+
+// 型として使用するための型定義
+export type BookStatusEnum = typeof BookStatusEnum[keyof typeof BookStatusEnum];
 
 export interface Book {
   id: number;
@@ -21,6 +25,7 @@ export interface Book {
   is_favorite?: boolean;
   genres?: string[];
   isbn?: string;
+  amazon_url?: string;
 }
 
 export interface BookCreate {

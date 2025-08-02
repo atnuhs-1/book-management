@@ -1,6 +1,6 @@
 // src/pages/FoodExpiryPage.tsx
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { GlassCard } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
 
@@ -16,7 +16,7 @@ type FoodItem = {
 export const FoodExpiryPage = () => {
   const { token } = useAuthStore();
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const hasAlertedRef = useRef(false); // ✅ 通知が1回だけ出るよう制御
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export const FoodExpiryPage = () => {
     };
 
     showAlert();
-  }, [foodItems]);
+  }, [foodItems, today]);
 
   const handleEat = async (id: number) => {
     try {

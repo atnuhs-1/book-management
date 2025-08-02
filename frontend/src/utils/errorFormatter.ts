@@ -30,6 +30,18 @@ export interface FormattedError {
 }
 
 /**
+ * 🎨 UI表示用のエラー分類
+ */
+export interface ErrorCategory {
+  type: 'network' | 'server' | 'client' | 'auth' | 'validation' | 'unknown';
+  title: string;
+  message: string;
+  action: string;
+  retryable: boolean;
+  severity: 'low' | 'medium' | 'high';
+}
+
+/**
  * 🎯 汎用エラーメッセージフォーマッター（既存ロジック移植 + Axios対応）
  */
 export const formatErrorMessage = (error: unknown): FormattedError => {
@@ -437,6 +449,83 @@ export const formatErrorMessageLegacy = (
   return {
     message: result.message,
     isAuthError: result.isAuthError,
+  };
+};
+
+export const categorizeError = (error: unknown): ErrorCategory => {
+  const details = formatErrorMessage(error);
+
+  if (isAxiosError(error)) {
+    const status = error.response?.status;
+
+    // ネットワークエラー
+    if (!error.response) {
+      return {
+        type: "network",
+        title: "ネットワークエラー",
+        message: details.message,
+        action: "インターネット接続を確認してください",
+        retryable: true,
+        severity: "medium",
+      };
+    }
+
+    // サーバーエラー
+    if (status && status >= 500) {
+      return {
+        type: "server",
+        title: "サーバーエラー",
+        message: details.message,
+        action: "しばらく待ってから再試行してください",
+        retryable: true,
+        severity: "high",
+      };
+    }
+
+    // 認証エラー
+    if (status === 401 || status === 403) {
+      return {
+        type: "auth",
+        title: "認証エラー",
+        message: details.message,
+        action: "再ログインしてください",
+        retryable: false,
+        severity: "high",
+      };
+    }
+
+    // バリデーションエラー
+    if (status === 400 || status === 422) {
+      return {
+        type: "validation",
+        title: "入力エラー",
+        message: details.message,
+        action: "入力内容を確認してください",
+        retryable: false,
+        severity: "low",
+      };
+    }
+
+    // その他のクライアントエラー
+    if (status && status >= 400 && status < 500) {
+      return {
+        type: "client",
+        title: "クライアントエラー",
+        message: details.message,
+        action: "操作を確認してください",
+        retryable: false,
+        severity: "medium",
+      };
+    }
+  }
+
+  return {
+    type: "unknown",
+    title: "エラー",
+    message: details.message,
+    action: "サポートにお問い合わせください",
+    retryable: false,
+    severity: "medium",
   };
 };
 

@@ -22,7 +22,6 @@ export const Layout = ({ children }: LayoutProps) => {
     logout,
     isLoading,
     isTokenExpired,
-    lastAuthError,
   } = useAuthStore();
 
   // 共通のユーザーメニュー状態管理

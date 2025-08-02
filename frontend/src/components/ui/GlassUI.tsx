@@ -84,7 +84,6 @@ interface GlassButtonProps {
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   loading?: boolean;
-  type?: "button" | "submit" | "reset";
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({

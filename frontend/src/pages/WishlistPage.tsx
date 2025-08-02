@@ -11,7 +11,11 @@ import {
 } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
 import { useBookStore } from "../stores/bookStore";
-import { BookStatusEnum } from "../types/book";
+import { BookStatusEnum, type Book } from "../types/book";
+
+// ソート型を定義（created_atを削除してidを使用）
+type SortBy = "title" | "author" | "published_date" | "id";
+type SortOrder = "asc" | "desc";
 
 export const WishlistPage = () => {
   const {
@@ -25,11 +29,9 @@ export const WishlistPage = () => {
 
   // ローカル検索状態
   const [searchQuery, setSearchQuery] = useState("");
-  // ソート状態
-  const [sortBy, setSortBy] = useState<
-    "title" | "author" | "published_date" | "created_at"
-  >("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  // ソート状態（created_atをidに変更）
+  const [sortBy, setSortBy] = useState<SortBy>("id");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const loadWishlist = useCallback(async () => {
     if (isAuthenticated && isInitialized) {
@@ -57,7 +59,7 @@ export const WishlistPage = () => {
 
   // ソート処理
   const sortedBooks = [...filteredBooks].sort((a, b) => {
-    let aValue, bValue;
+    let aValue: string | number, bValue: string | number;
 
     switch (sortBy) {
       case "title":
@@ -72,10 +74,11 @@ export const WishlistPage = () => {
         aValue = new Date(a.published_date || 0).getTime();
         bValue = new Date(b.published_date || 0).getTime();
         break;
-      case "created_at":
+      case "id":
       default:
-        aValue = new Date(a.created_at || 0).getTime();
-        bValue = new Date(b.created_at || 0).getTime();
+        // IDを追加順として使用（数値の大小で判定）
+        aValue = a.id;
+        bValue = b.id;
         break;
     }
 
@@ -85,24 +88,6 @@ export const WishlistPage = () => {
       return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
     }
   });
-
-  // ジャンル推定関数
-  const getGenre = (book: any) => {
-    const title = book.title.toLowerCase();
-    if (title.includes("巻") || title.includes("vol") || title.includes("第")) {
-      return "漫画";
-    } else if (
-      title.includes("code") ||
-      title.includes("技術") ||
-      title.includes("programming")
-    ) {
-      return "技術書";
-    } else if (title.includes("小説") || title.includes("novel")) {
-      return "小説";
-    } else {
-      return "書籍";
-    }
-  };
 
   // ✅ ウィッシュリスト専用: 所有済みに変更する機能
   const handleMarkAsOwned = async (bookId: number) => {
@@ -116,7 +101,7 @@ export const WishlistPage = () => {
   };
 
   // ✅ Amazon購入リンクを開く
-  const handleBuyOnAmazon = (book: any) => {
+  const handleBuyOnAmazon = (book: Book) => {
     // バックエンドから返されるamazon_urlがある場合はそれを使用
     if (book.amazon_url) {
       window.open(book.amazon_url, "_blank", "noopener,noreferrer");
@@ -197,7 +182,7 @@ export const WishlistPage = () => {
           <span className="text-sm text-gray-600">並び替え:</span>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
             className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-400/50"
           >
             <option value="created_at">追加日</option>
@@ -269,7 +254,7 @@ export const WishlistPage = () => {
                       }}
                     />
                     {/* フォールバック画像 */}
-                    <div className="hidden w-full h-full flex items-center justify-center bg-gray-200/50">
+                    <div className="hidden w-full h-full items-center justify-center bg-gray-200/50">
                       <span className="text-2xl opacity-50">💖</span>
                     </div>
                   </div>
