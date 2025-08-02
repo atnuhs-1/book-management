@@ -94,7 +94,7 @@ function App() {
     };
 
     initializeAuth();
-  }, []);
+  }, [checkAuth]);
 
   if (isLoading) {
     return (

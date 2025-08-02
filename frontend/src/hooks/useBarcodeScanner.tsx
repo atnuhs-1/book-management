@@ -1,11 +1,10 @@
-// frontend/src/hooks/useBarcodeScanner.ts - 汎用化版
+// frontend/src/hooks/useBarcodeScanner.ts - 型エラー修正版
 import { useRef, useEffect, useState, useCallback } from "react";
 import {
   BrowserMultiFormatReader,
   NotFoundException,
   Result,
 } from "@zxing/library";
-import { extractISBNFromScannedText } from "../utils/isbnValidator";
 import {
   extractBarcodeFromScannedText,
   type BarcodeValidationResult,
@@ -16,7 +15,7 @@ interface UseBarcodeScanner {
   isScanning: boolean;
   error: string | null;
   isInitialized: boolean;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   startScanning: () => Promise<void>;
   stopScanning: () => void;
 
@@ -38,6 +37,15 @@ interface ScannerConfig {
 
   // ✅ 新規追加: サポートするバーコード種別
   supportedTypes?: BarcodeType[];
+}
+
+interface CameraError {
+  name: string;
+  message: string;
+}
+
+interface ScanControls {
+  stop(): void;
 }
 
 export const useBarcodeScanner = (
@@ -67,7 +75,33 @@ export const useBarcodeScanner = (
 
   // スキャン制御用
   const lastScanTimeRef = useRef<number>(0);
-  const currentControlsRef = useRef<any>(null);
+  const currentControlsRef = useRef<ScanControls | null>(null);
+
+  /**
+   * スキャン停止
+   */
+  const stopScanning = useCallback((): void => {
+    if (!isScanning) return;
+
+    try {
+      console.log("⏹️ バーコードスキャン停止");
+
+      if (currentControlsRef.current) {
+        currentControlsRef.current.stop();
+        currentControlsRef.current = null;
+      }
+
+      if (readerRef.current) {
+        readerRef.current.reset();
+      }
+
+      setIsScanning(false);
+      console.log("✅ スキャン停止完了");
+    } catch (err) {
+      console.error("スキャン停止エラー:", err);
+      setIsScanning(false);
+    }
+  }, [isScanning]);
 
   /**
    * ZXingリーダーの初期化
@@ -89,7 +123,7 @@ export const useBarcodeScanner = (
 
         setIsInitialized(true);
         console.log("✅ ZXing リーダー初期化完了");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("❌ ZXing リーダー初期化失敗:", err);
         setError(getErrorMessage(err));
         setIsInitialized(false);
@@ -106,22 +140,23 @@ export const useBarcodeScanner = (
         readerRef.current.reset();
       }
     };
-  }, [preferBackCamera, supportedTypes]);
+  }, [preferBackCamera, supportedTypes, stopScanning]);
 
   /**
    * エラーメッセージの統一化
    */
-  const getErrorMessage = (err: any): string => {
-    if (err.name === "NotAllowedError") {
+  const getErrorMessage = (err: unknown): string => {
+    const error = err as CameraError;
+    if (error.name === "NotAllowedError") {
       return "カメラへのアクセス許可が必要です。ブラウザの設定でカメラを許可してください。";
-    } else if (err.name === "NotFoundError") {
+    } else if (error.name === "NotFoundError") {
       return "カメラが見つかりません。デバイスにカメラが接続されているか確認してください。";
-    } else if (err.name === "NotSupportedError") {
+    } else if (error.name === "NotSupportedError") {
       return "お使いのブラウザはカメラ機能をサポートしていません。";
-    } else if (err.name === "NotReadableError") {
+    } else if (error.name === "NotReadableError") {
       return "カメラは他のアプリケーションで使用中です。";
     } else {
-      return err.message || "カメラアクセスに失敗しました。";
+      return error.message || "カメラアクセスに失敗しました。";
     }
   };
 
@@ -177,7 +212,7 @@ export const useBarcodeScanner = (
    * バーコードスキャン結果の処理（汎用化）
    */
   const handleScanResult = useCallback(
-    (result: Result | null, error?: any) => {
+    (result: Result | null, error?: unknown) => {
       const now = Date.now();
 
       if (result) {
@@ -226,7 +261,7 @@ export const useBarcodeScanner = (
         console.error("スキャンエラー:", error);
       }
     },
-    [scanDelay, continuousScan, supportedTypes]
+    [scanDelay, continuousScan, supportedTypes, stopScanning]
   );
 
   /**
@@ -251,47 +286,26 @@ export const useBarcodeScanner = (
       // カメラデバイスを選択
       const selectedDeviceId = await selectCamera();
 
+      // selectedDeviceIdがundefinedの場合のチェック
+      if (!selectedDeviceId) {
+        throw new Error("利用可能なカメラが見つかりませんでした");
+      }
+
       // スキャン開始
       currentControlsRef.current =
-        await readerRef.current.decodeFromVideoDevice(
+        (await readerRef.current.decodeFromVideoDevice(
           selectedDeviceId,
           videoRef.current,
           handleScanResult
-        );
+        )) as unknown as ScanControls;
 
       console.log("✅ スキャン開始成功");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ スキャン開始エラー:", err);
       setError(getErrorMessage(err));
       setIsScanning(false);
     }
   };
-
-  /**
-   * スキャン停止
-   */
-  const stopScanning = useCallback((): void => {
-    if (!isScanning) return;
-
-    try {
-      console.log("⏹️ バーコードスキャン停止");
-
-      if (currentControlsRef.current) {
-        currentControlsRef.current.stop();
-        currentControlsRef.current = null;
-      }
-
-      if (readerRef.current) {
-        readerRef.current.reset();
-      }
-
-      setIsScanning(false);
-      console.log("✅ スキャン停止完了");
-    } catch (err) {
-      console.error("スキャン停止エラー:", err);
-      setIsScanning(false);
-    }
-  }, [isScanning]);
 
   /**
    * ISBNが検出された時のコールバック登録（既存）
@@ -356,10 +370,14 @@ export const useCameraPermission = () => {
         } else {
           // Permissions API が利用できない場合は直接確認
           try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            const stream = await (
+              navigator as unknown as { mediaDevices: MediaDevices }
+            ).mediaDevices.getUserMedia({
               video: true,
             });
-            stream.getTracks().forEach((track) => track.stop());
+            stream
+              .getTracks()
+              .forEach((track: MediaStreamTrack) => track.stop());
             setPermission("granted");
           } catch {
             setPermission("denied");

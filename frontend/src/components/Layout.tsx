@@ -22,7 +22,6 @@ export const Layout = ({ children }: LayoutProps) => {
     logout,
     isLoading,
     isTokenExpired,
-    lastAuthError,
   } = useAuthStore();
 
   // 共通のユーザーメニュー状態管理
@@ -171,11 +170,15 @@ export const Layout = ({ children }: LayoutProps) => {
           <div className="flex items-center justify-between h-16">
             {/* ロゴ */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-sm">🏠</span>
+              <div className="w-9 h-9 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
+                <img
+                  src="/icon-512x512.jpg"
+                  alt="LibrEats Logo"
+                  className="rounded-md"
+                />
               </div>
               <h1 className="text-lg font-light text-gray-800">
-                Life Manager PWA
+                LibrEats
               </h1>
             </Link>
 

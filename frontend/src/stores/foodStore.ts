@@ -1,8 +1,16 @@
-// frontend/src/stores/foodStore.ts
+// frontend/src/stores/foodStore.ts - 型安全版（error: any修正）
+
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import type { Food, FoodCreate, FoodUpdate, ProductInfo } from "../types/food";
+
+// ✅ errorFormatterをインポート
+import {
+  formatFoodError,
+  formatErrorMessage,
+  logError,
+} from "../utils/errorFormatter";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -42,7 +50,7 @@ interface FoodStore {
   // API アクション
   fetchFoods: () => Promise<void>;
   fetchFoodById: (id: number) => Promise<Food | null>;
-  createFood: (foodData: FoodCreate) => Promise<void>;
+  createFood: (foodData: FoodCreate & { force?: boolean }) => Promise<void>; // ✅ 型を明確化
   updateFoodById: (id: number, updateData: FoodUpdate) => Promise<void>;
   deleteFoodById: (id: number) => Promise<void>;
 
@@ -53,116 +61,7 @@ interface FoodStore {
   ) => Promise<ProductInfo | null>;
 }
 
-// エラーメッセージの詳細な判定（bookStoreと同様）
-const formatErrorMessage = (
-  error: any
-): { message: string; isAuthError: boolean } => {
-  if (typeof error === "string") {
-    return { message: error, isAuthError: false };
-  }
-
-  // ネットワークエラー
-  if (!error.response) {
-    return {
-      message:
-        "ネットワークエラーが発生しました。インターネット接続を確認してください。",
-      isAuthError: false,
-    };
-  }
-
-  const { status, data } = error.response;
-
-  // HTTPステータスコード別の詳細メッセージ
-  switch (status) {
-    case 401:
-      const detail = data?.detail || "";
-
-      // バックエンドからの期限切れメッセージを検出
-      if (
-        detail.includes("有効期限が切れました") ||
-        detail.includes("expired")
-      ) {
-        return {
-          message:
-            "セッションの有効期限が切れました。再度ログインしてください。",
-          isAuthError: true,
-        };
-      }
-
-      if (
-        detail.includes("認証情報が無効です") ||
-        detail.includes("トークンが無効です")
-      ) {
-        return {
-          message: "認証情報が無効です。ログインし直してください。",
-          isAuthError: true,
-        };
-      }
-
-      if (detail.includes("ユーザーが見つかりません")) {
-        return {
-          message: "ユーザー情報が見つかりません。再度ログインしてください。",
-          isAuthError: true,
-        };
-      }
-
-      return {
-        message: detail || "認証に失敗しました。ログインしてください。",
-        isAuthError: true,
-      };
-
-    case 403:
-      return {
-        message: "この操作を行う権限がありません。",
-        isAuthError: false,
-      };
-
-    case 404:
-      return {
-        message: "食品が見つかりません。削除された可能性があります。",
-        isAuthError: false,
-      };
-
-    case 422:
-      // FastAPIのバリデーションエラー
-      if (Array.isArray(data?.detail)) {
-        const validationErrors = data.detail
-          .map((e: any) => {
-            const field = e.loc?.join(".");
-            const message = e.msg;
-            return `${field}: ${message}`;
-          })
-          .join(", ");
-        return {
-          message: `入力エラー: ${validationErrors}`,
-          isAuthError: false,
-        };
-      }
-      return {
-        message: "入力データに問題があります。",
-        isAuthError: false,
-      };
-
-    case 500:
-      return {
-        message:
-          "サーバーエラーが発生しました。しばらく待ってから再試行してください。",
-        isAuthError: false,
-      };
-
-    default:
-      // カスタムメッセージがある場合
-      if (data?.detail) {
-        if (typeof data.detail === "string") {
-          return { message: data.detail, isAuthError: false };
-        }
-      }
-      return {
-        message: `エラーが発生しました (${status})`,
-        isAuthError: false,
-      };
-  }
-};
+// ✅ 既存のformatErrorMessage関数を削除（errorFormatterを使用）
 
 export const useFoodStore = create<FoodStore>()(
   devtools((set, get) => ({
@@ -211,26 +110,29 @@ export const useFoodStore = create<FoodStore>()(
       set({ lastAuthError: error, hasAuthError: !!error }),
     clearAuthError: () => set({ lastAuthError: null, hasAuthError: false }),
 
-    // 食品一覧取得
+    // ✅ 修正1: 型安全な食品一覧取得
     fetchFoods: async () => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.get(`${API_BASE_URL}/me/foods`);
         set({ foods: response.data, isLoading: false });
 
         // 成功時は認証エラー状態をクリア
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("食品取得エラー:", err);
+      } catch (error: unknown) {
+        console.error("食品取得エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.fetchFoods");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
         } else {
           set({
-            error: message,
+            error: errorResult.message,
             isLoading: false,
             foods: [],
           });
@@ -238,38 +140,40 @@ export const useFoodStore = create<FoodStore>()(
       }
     },
 
-    // 食品詳細取得
+    // ✅ 修正2: 型安全な食品詳細取得
     fetchFoodById: async (id: number) => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.get(`${API_BASE_URL}/foods/${id}`);
         set({ isLoading: false });
 
         get().clearAuthError();
         return response.data;
-      } catch (err: any) {
-        console.error("食品詳細取得エラー:", err);
+      } catch (error: unknown) {
+        console.error("食品詳細取得エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.fetchFoodById");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
         } else {
-          set({ error: message, isLoading: false });
+          set({ error: errorResult.message, isLoading: false });
         }
         return null;
       }
     },
 
-    // foodStore.ts 内
-
+    // ✅ 修正3: 型安全な食品作成
     createFood: async (foodData: FoodCreate & { force?: boolean }) => {
       set({ isLoading: true, error: null });
 
       try {
         const response = await axios.post(`${API_BASE_URL}/foods`, foodData, {
-          params: foodData.force ? { force: true } : {}, // ← force をここに
+          params: foodData.force ? { force: true } : {},
         });
 
         set((state) => ({
@@ -278,27 +182,28 @@ export const useFoodStore = create<FoodStore>()(
         }));
 
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("食品作成エラー:", err);
+      } catch (error: unknown) {
+        console.error("食品作成エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.createFood");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
           set({
-            error: message,
+            error: errorResult.message,
             isLoading: false,
           });
-          throw new Error(message);
+          throw new Error(errorResult.message);
         }
       }
     },
 
-
-    // バーコードによる食品登録機能
+    // ✅ 修正4: 型安全なバーコード食品登録
     createFoodByBarcode: async (barcode: string, type: "JAN" | "EAN") => {
       set({
         isRegisteringByBarcode: true,
@@ -339,28 +244,31 @@ export const useFoodStore = create<FoodStore>()(
         console.log("✅ バーコード食品登録成功:", registeredFood.name);
 
         return registeredFood;
-      } catch (err: any) {
-        console.error("❌ バーコード食品登録エラー:", err);
+      } catch (error: unknown) {
+        console.error("❌ バーコード食品登録エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.createFoodByBarcode");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isRegisteringByBarcode: false });
           throw new Error("認証が必要です。再度ログインしてください。");
         } else {
           set({
-            error: message,
+            error: errorResult.message,
             isRegisteringByBarcode: false,
           });
-          throw new Error(message);
+          throw new Error(errorResult.message);
         }
       }
     },
 
-    // 食品更新
+    // ✅ 修正5: 型安全な食品更新
     updateFoodById: async (id: number, updateData: FoodUpdate) => {
       set({ isLoading: true, error: null });
+
       try {
         const response = await axios.put(
           `${API_BASE_URL}/foods/${id}`,
@@ -373,28 +281,31 @@ export const useFoodStore = create<FoodStore>()(
 
         set({ isLoading: false });
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("食品更新エラー:", err);
+      } catch (error: unknown) {
+        console.error("食品更新エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.updateFoodById");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
           set({
-            error: message,
+            error: errorResult.message,
             isLoading: false,
           });
-          throw new Error(message);
+          throw new Error(errorResult.message);
         }
       }
     },
 
-    // 食品削除
+    // ✅ 修正6: 型安全な食品削除
     deleteFoodById: async (id: number) => {
       set({ isLoading: true, error: null });
+
       try {
         await axios.delete(`${API_BASE_URL}/foods/${id}`);
 
@@ -404,32 +315,33 @@ export const useFoodStore = create<FoodStore>()(
 
         set({ isLoading: false });
         get().clearAuthError();
-      } catch (err: any) {
-        console.error("食品削除エラー:", err);
+      } catch (error: unknown) {
+        console.error("食品削除エラー:", error);
 
-        const { message, isAuthError } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatFoodError(error);
+        logError(error, "foodStore.deleteFoodById");
 
-        if (isAuthError) {
-          get().setAuthError(message);
+        if (errorResult.isAuthError) {
+          get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
         } else {
           set({
-            error: message,
+            error: errorResult.message,
             isLoading: false,
           });
-          throw new Error(message);
+          throw new Error(errorResult.message);
         }
       }
     },
 
-    // 外部API：バーコードから商品情報を取得（認証不要）
+    // ✅ 修正7: 型安全な外部API商品検索
     fetchProductByBarcode: async (barcode: string, type: "JAN" | "EAN") => {
       try {
         console.log(`🔍 ${type}バーコード検索:`, barcode);
 
         // バックエンド経由で商品情報を取得
-        // （楽天商品検索API、独自商品データベース等を使用）
         const response = await axios.get(
           `${API_BASE_URL}/products/search-by-barcode`,
           {
@@ -441,19 +353,21 @@ export const useFoodStore = create<FoodStore>()(
         console.log("✅ 商品情報取得成功:", productInfo.name);
 
         return productInfo;
-      } catch (err: any) {
-        console.error("❌ 商品情報取得エラー:", err);
+      } catch (error: unknown) {
+        console.error("❌ 商品情報取得エラー:", error);
 
-        const { message } = formatErrorMessage(err);
+        // ✅ errorFormatterを使用した型安全なエラーハンドリング
+        const errorResult = formatErrorMessage(error); // 外部APIなので汎用フォーマッター
+        logError(error, "foodStore.fetchProductByBarcode");
 
         // 商品が見つからない場合は null を返す（エラーではない）
-        if (err.response?.status === 404) {
+        if (isAxiosError(error) && error.response?.status === 404) {
           console.log("商品情報が見つかりませんでした");
           return null;
         }
 
         // その他のエラーはログに記録してnullを返す
-        set({ error: message });
+        set({ error: errorResult.message });
         return null;
       }
     },

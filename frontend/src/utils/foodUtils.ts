@@ -3,10 +3,8 @@ import type {
   Food,
   FoodCategory,
   ExpirationInfo,
-  ExpirationStatus,
   FoodStats,
   FoodFilter,
-  FOOD_CATEGORIES,
 } from "../types/food";
 
 /**
@@ -458,80 +456,3 @@ export const generateAlertMessages = (foods: Food[]): string[] => {
 
   return messages;
 };
-
-/**
- * テスト用のサンプル食品データ
- */
-export const SAMPLE_FOODS: Omit<
-  Food,
-  "id" | "user_id" | "created_at" | "updated_at"
->[] = [
-  {
-    name: "カップラーメン",
-    category: "非常食",
-    quantity: 5,
-    expiration_date: "2024-12-31",
-    barcode: "4901301234567",
-    barcode_type: "JAN",
-  },
-  {
-    name: "牛乳",
-    category: "生鮮食品",
-    quantity: 1,
-    expiration_date: "2024-08-05",
-  },
-  {
-    name: "お茶",
-    category: "飲料",
-    quantity: 24,
-    expiration_date: "2024-10-15",
-  },
-  {
-    name: "醤油",
-    category: "調味料",
-    quantity: 1,
-    expiration_date: "2025-03-15",
-  },
-];
-
-/**
- * 開発用：食品ユーティリティのテスト実行
- */
-export const testFoodUtils = (): void => {
-  console.log("🍽️ Food Utils テスト開始");
-
-  // サンプルデータでテスト
-  const sampleFood: Food = {
-    id: 1,
-    name: "テスト食品",
-    category: "生鮮食品",
-    quantity: 2,
-    expiration_date: "2024-08-03", // 2日後と仮定
-    user_id: 1,
-    created_at: "2024-08-01T00:00:00Z",
-    updated_at: "2024-08-01T00:00:00Z",
-  };
-
-  // 期限チェックテスト
-  const expirationInfo = getExpirationInfo(sampleFood.expiration_date);
-  console.log("期限情報:", expirationInfo);
-
-  // カテゴリ情報テスト
-  const categoryInfo = getCategoryInfo(sampleFood.category);
-  console.log("カテゴリ情報:", categoryInfo);
-
-  // カテゴリ推定テスト
-  const suggestedCategory = suggestCategoryFromName("カップラーメン");
-  console.log("推定カテゴリ:", suggestedCategory);
-
-  // 検証テスト
-  const validation = validateFoodData(sampleFood);
-  console.log("検証結果:", validation);
-
-  console.log("✅ Food Utils テスト完了");
-};
-
-// 開発環境でのみテスト実行
-if (import.meta.env.DEV) {
-  // testFoodUtils(); // 必要に応じてコメントアウト
-}

@@ -1,15 +1,14 @@
-// frontend/src/pages/BarcodeScanPage.tsx - バーコードスキャン専用ページ
+// frontend/src/pages/BarcodeScanPage.tsx - 型エラー修正版
 
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
-import type { BarcodeValidationResult } from "../utils/barcodeValidator";
-import {
-  GlassCard,
-  GlassButton,
-  GlassError,
-} from "../components/ui/GlassUI";
+import type {
+  BarcodeValidationResult,
+  BarcodeType,
+} from "../utils/barcodeValidator";
+import { GlassCard, GlassButton, GlassError } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
 
 export const BarcodeScanPage = () => {
@@ -99,9 +98,12 @@ export const BarcodeScanPage = () => {
           `${mode === "book" ? "書籍登録" : "食品登録"}には${mode === "book" ? "ISBN" : "JAN/EAN"}バーコードが必要です`
         );
       }
-    } catch (error: any) {
+    } catch (error) {
+      // ✅ 型安全なエラーハンドリング
+      const errorMessage =
+        error instanceof Error ? error.message : "不明なエラーが発生しました";
       console.error("バーコード処理エラー:", error);
-      setScanError(error.message);
+      setScanError(errorMessage);
       setIsProcessing(false);
       setLastScannedCode(null);
     }
@@ -123,12 +125,17 @@ export const BarcodeScanPage = () => {
         // 書籍検索結果へリダイレクト
         navigate(`/search-books?isbn=${isbn}&from=scan`);
       }
-    } catch (error: any) {
+    } catch (error) {
+      // ✅ 型安全なエラーハンドリング
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "書籍登録中にエラーが発生しました";
       console.error("書籍処理エラー:", error);
 
       // エラーハンドリング: 手動入力への誘導
       const shouldRetry = confirm(
-        `❌ ${error.message}\n\n手動入力で書籍を追加しますか？`
+        `❌ ${errorMessage}\n\n手動入力で書籍を追加しますか？`
       );
 
       if (shouldRetry) {
@@ -168,16 +175,16 @@ export const BarcodeScanPage = () => {
   };
 
   /**
-   * ✅ サポートするバーコード種別の決定
+   * ✅ サポートするバーコード種別の決定（型修正）
    */
-  const getSupportedBarcodeTypes = () => {
+  const getSupportedBarcodeTypes = (): BarcodeType[] => {
     switch (mode) {
       case "book":
-        return ["ISBN"] as const;
+        return ["ISBN"];
       case "food":
-        return ["JAN", "EAN"] as const;
+        return ["JAN", "EAN"];
       default:
-        return ["ISBN", "JAN", "EAN"] as const;
+        return ["ISBN", "JAN", "EAN"];
     }
   };
 
@@ -208,9 +215,6 @@ export const BarcodeScanPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* ✅ ヘッダー */}
-
-
       {/* ✅ エラー表示 */}
       {(scanError || bookError) && (
         <div>

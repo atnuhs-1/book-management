@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GlassCard, GlassInput } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
-import { FOOD_UNITS } from "../types/food";
+import { FOOD_UNITS, type Food } from "../types/food";
 
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️" },
@@ -27,9 +27,9 @@ export const FoodPage = () => {
   const { token } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [foodItems, setFoodItems] = useState<any[]>([]);
+  const [foodItems, setFoodItems] = useState<Food[]>([]);
   const [daysLeftMap, setDaysLeftMap] = useState<{ [foodId: number]: number | null }>({});
-  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [editingItem, setEditingItem] = useState<Food | null>(null);
   const [editForm, setEditForm] = useState({ name: "", category: "", quantity: "", unit: "g", expiration_date: "" });
   const [forceEditConfirmVisible, setForceEditConfirmVisible] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState("");
@@ -73,7 +73,7 @@ export const FoodPage = () => {
     if (foodItems.length > 0) fetchAllDaysLeft();
   }, [foodItems, token]);
 
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: Food) => {
     setEditingItem(item);
     setEditForm({
       name: item.name,
@@ -125,9 +125,19 @@ export const FoodPage = () => {
       setFoodItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setEditingItem(null);
       alert("✅ 食品を更新しました");
-    } catch (err: any) {
-      console.error(err);
-      alert("更新に失敗しました: " + err.message);
+    } catch (error) {
+      console.error(error);
+      let errorMessage = "更新に失敗しました";
+
+      if (error instanceof Error) {
+        errorMessage += ": " + error.message;
+      } else if (typeof error === "string") {
+        errorMessage += ": " + error;
+      } else {
+        errorMessage += ": 不明なエラーが発生しました";
+      }
+
+      alert(errorMessage);
     }
   };
 
@@ -141,7 +151,7 @@ export const FoodPage = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("削除に失敗しました");
-      setFoodItems((prev) => prev.filter((item: any) => item.id !== id));
+      setFoodItems((prev) => prev.filter((item: Food) => item.id !== id));
     } catch (err) {
       console.error(err);
       alert("削除に失敗しました");
@@ -200,7 +210,7 @@ export const FoodPage = () => {
           <option value="days_left">期限まで近い順</option>
         </select>
       </div>
-  
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => (
           <GlassCard key={item.id} className="p-6">
@@ -262,7 +272,7 @@ export const FoodPage = () => {
           </GlassCard>
         ))}
       </div>
-  
+
       {editingItem && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
@@ -343,7 +353,7 @@ export const FoodPage = () => {
           </div>
         </div>
       )}
-  
+
       {forceEditConfirmVisible && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl space-y-4">
@@ -375,5 +385,5 @@ export const FoodPage = () => {
         </div>
       )}
     </div>
-  );  
+  );
 };

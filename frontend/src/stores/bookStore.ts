@@ -76,7 +76,7 @@ interface BookStore {
   // ✅ 既存: ウィッシュリスト登録関連のアクション
   setRegisteringToWishlist: (registering: boolean) => void;
   setWishlistError: (error: string | null) => void;
-  addToWishlist: (bookData: any) => Promise<Book>;
+  addToWishlist: (bookData: GoogleBookInfo) => Promise<Book>;
 
   // ✅ 新規追加: ウィッシュリスト取得関連のアクション
   setWishlistBooks: (books: Book[]) => void;
@@ -239,8 +239,21 @@ export const useBookStore = create<BookStore>()(
     },
 
     // ✅ 既存機能: ウィッシュリストに追加
-    addToWishlist: async (bookData: any) => {
+    addToWishlist: async (book: GoogleBookInfo) => {
       set({ isRegisteringToWishlist: true, wishlistError: null });
+
+      // 内部で変換処理
+      const bookData = {
+        title: book.title,
+        authors: Array.isArray(book.authors)
+          ? book.authors
+          : book.authors
+            ? [book.authors]
+            : [],
+        publisher: book.publisher,
+        cover_image_url: book.cover_image_url,
+        published_date: book.published_date,
+      };
 
       try {
         const response = await axios.post(
