@@ -5,6 +5,8 @@ import { GlassCard, GlassInput } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
 import { FOOD_UNITS, type Food } from "../types/food";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️" },
   { id: "野菜・きのこ類", name: "野菜・きのこ類", icon: "🥬" },
@@ -38,7 +40,7 @@ export const FoodPage = () => {
   useEffect(() => {
     const fetchFoods = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/me/foods", {
+        const res = await fetch(`${API_BASE_URL}/me/foods`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("食品の取得に失敗しました");
@@ -57,7 +59,7 @@ export const FoodPage = () => {
       await Promise.all(
         foodItems.map(async (item) => {
           try {
-            const res = await fetch(`http://localhost:8000/api/foods/${item.id}/days_left`, {
+            const res = await fetch(`${API_BASE_URL}/foods/${item.id}/days_left`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error();
@@ -87,7 +89,7 @@ export const FoodPage = () => {
   const handleUpdate = async (force = false) => {
     if (!editingItem) return;
     try {
-      const url = new URL(`http://localhost:8000/api/foods/${editingItem.id}`);
+      const url = new URL(`${API_BASE_URL}/api/foods/${editingItem.id}`);
       if (force) url.searchParams.set("force", "true");
 
       const res = await fetch(url.toString(), {
@@ -146,7 +148,7 @@ export const FoodPage = () => {
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/foods/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/foods/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
