@@ -1,5 +1,3 @@
-// src/pages/SettingsPage.tsx
-
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useThemeStore } from "../stores/themeStore";
@@ -8,11 +6,13 @@ import { useNavigate } from "react-router-dom";
 
 export const SettingsPage = () => {
   const { theme, toggleTheme } = useThemeStore();
-  const { token, logout } = useAuthStore(); // ✅ logout を取得
+  const { token, logout } = useAuthStore();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [originalUsername, setOriginalUsername] = useState(""); // ✅ 追加
+  const [originalEmail, setOriginalEmail] = useState(""); // ✅ 追加
   const [loading, setLoading] = useState(true);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -32,6 +32,8 @@ export const SettingsPage = () => {
       .then((res) => {
         setUsername(res.data.username);
         setEmail(res.data.email);
+        setOriginalUsername(res.data.username); // ✅ 初期値記録
+        setOriginalEmail(res.data.email);
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -39,6 +41,13 @@ export const SettingsPage = () => {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ✅ 入力に変更がなければスキップ
+    if (username === originalUsername && email === originalEmail) {
+      alert("変更内容がありません。");
+      return;
+    }
+
     try {
       await axios.put(
         `${API_BASE}/api/auth/users/me`,
@@ -46,8 +55,8 @@ export const SettingsPage = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("ユーザー情報を更新しました。再ログインしてください。");
-      logout(); // ✅ トークン削除
-      navigate("/login"); // ✅ ログイン画面へ遷移
+      logout();
+      navigate("/login");
     } catch (err) {
       console.error(err);
       alert("ユーザー情報の更新に失敗しました。");
