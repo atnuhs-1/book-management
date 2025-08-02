@@ -10,13 +10,31 @@ from typing import Optional  # これが必要！
 
 # ✅ 表示用に日本語、DBには日本語文字列を保存
 class FoodCategory(PyEnum):
-    FRESH = "生鮮食品"
-    EMERGENCY = "非常食"
-    BEVERAGES = "飲料"
-    SEASONINGS = "調味料"
+    # 生鮮食品（細分化）
+    VEGETABLES = "野菜・きのこ類"
+    FRUITS = "果物"
+    MEAT = "精肉"
+    SEAFOOD = "魚介類"
+    DAIRY_EGGS = "卵・乳製品"
+
+    # 加工食品
     FROZEN = "冷凍食品"
+    CANNED_RETORT = "レトルト・缶詰"
+    PROCESSED_MEAT = "ハム・ソーセージ類"
+    SIDE_DISH = "惣菜"
+
+    # その他食品
     SNACKS = "お菓子"
+
+    STAPLE = "米、パン、麺"
+    SEASONING = "調味料"
+
+    # 飲料
+    BEVERAGES = "飲料"
+    OTHER = "その他"
+
     # OTHER = "その他"
+
 
 class QuantityUnit(PyEnum):
     GRAM = "g"
