@@ -1,6 +1,7 @@
 import os
 from datetime import date, timedelta
 from urllib.parse import urlencode
+import httpx
 
 import requests
 from app.core.auth import get_current_user
@@ -19,6 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", tags=["food_items"])
+JANCODE_API_KEY = os.getenv("JANCODE_API_KEY")
+RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID")
 
 load_dotenv()  # 環境変数（.env）読み込み
 
@@ -357,4 +360,102 @@ def get_days_until_expiration(
         "food_name": food.name,
         "expiration_date": food.expiration_date,
         "days_left": days_left
+    }
+
+@router.get("/category-from-barcode", summary="JANコードから楽天カテゴリ名を取得")
+async def category_from_barcode(
+    jan_code: str = Query(..., min_length=8, max_length=13)
+):
+    debug = {
+        "jan_code": jan_code,
+        "product_name": None,
+        "genre_id": None,
+        "genre_name": None
+    }
+
+    # ✅ Step 1: JANコード → 商品名
+    try:
+        item, full_url = fetch_jancode_product(jan_code)
+        product_name = item.get("itemName", None)
+        debug["product_name"] = product_name
+    except HTTPException as e:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": e.detail
+        }
+
+    if not product_name:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": "商品名が取得できませんでした"
+        }
+
+    # ✅ Step 2: 商品名 → 楽天ジャンルID（商品検索API）
+    rakuten_search_url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
+    rakuten_search_params = {
+        "applicationId": RAKUTEN_APP_ID,
+        "keyword": product_name,
+        "format": "json"
+    }
+
+    async with httpx.AsyncClient() as client:
+        search_res = await client.get(rakuten_search_url, params=rakuten_search_params)
+
+    if search_res.status_code != 200:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": f"楽天商品検索API失敗（status {search_res.status_code}）"
+        }
+
+    search_data = search_res.json()
+    if "Items" not in search_data or len(search_data["Items"]) == 0:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": "楽天商品検索にヒットしませんでした"
+        }
+
+    genre_id = search_data["Items"][0]["Item"]["genreId"]
+    debug["genre_id"] = genre_id
+
+    # ✅ Step 3: ジャンルID → ジャンル名（ジャンル検索API ※バージョン修正）
+    genre_url = "https://app.rakuten.co.jp/services/api/IchibaGenre/Search/20140222"
+    genre_params = {
+        "applicationId": RAKUTEN_APP_ID,
+        "genreId": genre_id,
+        "format": "json"
+    }
+
+    async with httpx.AsyncClient() as client:
+        genre_res = await client.get(genre_url, params=genre_params)
+
+    if genre_res.status_code != 200:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": f"楽天ジャンルAPI失敗（status {genre_res.status_code}）"
+        }
+
+    try:
+        genre_data = genre_res.json()
+        current = genre_data.get("current")
+        if isinstance(current, dict):
+            genre_name = current.get("genreName")
+        else:
+            genre_name = None
+    except Exception as e:
+        return {
+            "category": None,
+            "debug": debug,
+            "error": f"ジャンルJSONの解析に失敗: {str(e)}"
+        }
+
+    debug["genre_name"] = genre_name
+
+    return {
+        "category": genre_name,
+        "debug": debug
     }
