@@ -17,80 +17,56 @@
 **LibrEats-demo**
 [![LibrEats Demo Video](https://img.shields.io/badge/🎥_Demo_Video-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=S4OUvLMFAYU)
 
-### アプリ画面
+## 📱 アプリ画面
+
 <div align="center">
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1300px; margin: 0 auto; padding: 20px;">
+### 🖥️ デスクトップ画面
 
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/home.png" alt="ホーム画面" style="width: 100%; border-radius: 15px;">
+| ホーム画面 | 食品一覧 |
+|:---:|:---:|
+| <img src="./docs/screenshots/home.png" alt="ホーム画面" width="400"> | <img src="./docs/screenshots/food_list.png" alt="食品一覧" width="400"> |
 
-</div>
+| 書籍一覧 | 期限管理 |
+|:---:|:---:|
+| <img src="./docs/screenshots/book_list.png" alt="書籍一覧" width="400"> | <img src="./docs/screenshots/food_expired.png" alt="期限管理" width="400"> |
 
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/food_list.png" alt="食品一覧" style="width: 100%; border-radius: 15px;">
+| 書籍検索 | レシピ提案 |
+|:---:|:---:|
+| <img src="./docs/screenshots/book_search.png" alt="書籍検索" width="400"> | <img src="./docs/screenshots/recipe_suggest.png" alt="レシピ提案" width="400"> |
 
-</div>
+---
 
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/book_list.png" alt="書籍一覧" style="width: 100%; border-radius: 15px;">
+### 📱 モバイル画面
 
-</div>
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/food_expired.png" alt="期限管理" style="width: 100%; border-radius: 15px;">
-
-</div>
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/book_search.png" alt="検索" style="width: 100%; border-radius: 15px;">
-
-</div>
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 20px; padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/recipe_suggest.png" alt="レシピ提案" style="width: 100%; border-radius: 15px;">
-
-</div>
-
-</div>
-
-</div>
-
-#### 📱 モバイル画面
-
-<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; max-width: 800px; margin: 20px auto; padding: 0 20px;">
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 15px; padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/wishlist_mobile.png" alt="バーコードスキャン" style="width: 100%; border-radius: 10px; aspect-ratio: 9/16;">
-
-</div>
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 15px; padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/barcode_init_mobile.png" alt="検索画面" style="width: 100%; border-radius: 10px; aspect-ratio: 9/16;">
+<table>
+<tr>
+<td align="center" width="25%">
+<img src="./docs/screenshots/wishlist_mobile.png" alt="ウィッシュリスト" width="160">
+<br>
+<strong>ウィッシュリスト</strong>
+</td>
+<td align="center" width="25%">
+<img src="./docs/screenshots/barcode_init_mobile.png" alt="バーコード初期画面" width="160">
+<br>
+<strong>バーコードスキャン</strong>
+</td>
+<td align="center" width="25%">
+<img src="./docs/screenshots/barcode_scan_mobile.png" alt="スキャン中" width="160">
+<br>
+<strong>スキャン実行中</strong>
+</td>
+<td align="center" width="25%">
+<img src="./docs/screenshots/barcode_registered_mobile.png" alt="登録完了" width="160">
+<br>
+<strong>登録完了</strong>
+</td>
+</tr>
+</table>
 
 </div>
 
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 15px; padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/barcode_scan_mobile.png" alt="ウィッシュリスト" style="width: 100%; border-radius: 10px; aspect-ratio: 9/16;">
-</div>
-
-<div style="background: linear-gradient(145deg, #f0f0f0, #ffffff); border-radius: 15px; padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
-  <img src="./docs/screenshots/barcode_registered_mobile.png" alt="プロフィール" style="width: 100%; border-radius: 10px; aspect-ratio: 9/16;">
-</div>
-
-</div>
-
-<!-- モバイル表示用（画面幅が小さい場合は2列表示） -->
-<style>
-@media (max-width: 768px) {
-  .mobile-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
-  }
-}
-</style>
-
-</div>
+---
 
 ## 🎯 プロジェクト概要
 
