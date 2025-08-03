@@ -19,18 +19,21 @@ export const FoodExpiryPage = () => {
   const { token } = useAuthStore();
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const today = useMemo(() => new Date(), []);
-  const hasAlertedRef = useRef(false); // ✅ 通知が1回だけ出るよう制御
+  const hasAlertedRef = useRef(false);
 
   useEffect(() => {
     const fetchFoods = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/me/foods/`, {
+        const res = await fetch(`${API_BASE_URL}/me/foods`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        if (!res.ok) throw new Error("食品の取得に失敗しました");
-
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("食品取得失敗:", errorText);
+          throw new Error("食品の取得に失敗しました");
+        }
         const data = await res.json();
         setFoodItems(data);
       } catch (err) {
@@ -45,20 +48,26 @@ export const FoodExpiryPage = () => {
     if (hasAlertedRef.current) return;
 
     const showAlert = () => {
-      const alertDays = [7, 5, 3, 1];
+      const alertDays = [7, 5, 3, 1, 0]; // ← 0日を追加
       const alerted: string[] = [];
       foodItems.forEach((item) => {
         const diff = Math.ceil(
           (new Date(item.expiration_date).getTime() - today.getTime()) /
             (1000 * 60 * 60 * 24)
         );
+    
         if (alertDays.includes(diff)) {
-          alerted.push(`${item.name} があと ${diff} 日で期限です`);
+          if (diff === 0) {
+            alerted.push(`${item.name} は今日が期限です`);
+          } else {
+            alerted.push(`${item.name} があと ${diff} 日で期限です`);
+          }
         }
       });
+    
       if (alerted.length > 0) {
         alert(alerted.join("\n"));
-        hasAlertedRef.current = true; // ✅ アラート済みにマーク
+        hasAlertedRef.current = true;
       }
     };
 
@@ -67,11 +76,15 @@ export const FoodExpiryPage = () => {
 
   const handleEat = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/foods/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/foods/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("削除に失敗しました");
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("削除失敗:", errorText);
+        throw new Error("削除に失敗しました");
+      }
       setFoodItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       console.error(err);
@@ -79,13 +92,18 @@ export const FoodExpiryPage = () => {
     }
   };
 
-  const expiredItems = foodItems.filter(
-    (item) => new Date(item.expiration_date) < today
-  );
-  const expiringItems = foodItems.filter((item) => {
-    const expiry = new Date(item.expiration_date);
+  const expiredItems = foodItems.filter((item) => {
     const diff = Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (new Date(item.expiration_date).getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    return diff < 0;
+  });
+
+  const expiringItems = foodItems.filter((item) => {
+    const diff = Math.ceil(
+      (new Date(item.expiration_date).getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24)
     );
     return diff >= 0 && diff <= 3;
   });
