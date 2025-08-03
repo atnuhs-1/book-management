@@ -139,6 +139,7 @@ def lookup_food_name(
     return {
         "name": name,
         "quantity": quantity,
+        "unit": unit,
     }
 
 

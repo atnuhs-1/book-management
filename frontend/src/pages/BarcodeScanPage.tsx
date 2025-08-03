@@ -10,6 +10,7 @@ import type {
 } from "../utils/barcodeValidator";
 import { GlassCard, GlassButton, GlassError } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
+import { useFoodStore } from "../stores/foodStore";
 
 export const BarcodeScanPage = () => {
   const navigate = useNavigate();
@@ -20,13 +21,15 @@ export const BarcodeScanPage = () => {
   const mode = searchParams.get("mode") || "book"; // book | food
   const action = searchParams.get("action") || "register"; // register | search
 
-  // ✅ bookStoreから機能を取得
+  // ✅ bookStore & foodStoreから機能を取得
   const {
     createBookByISBN,
     isRegisteringByISBN,
     setRegisteringByISBN,
     error: bookError,
   } = useBookStore();
+
+  const { lookupFoodByBarcode, isLookingUpByBarcode } = useFoodStore();
 
   const { isAuthenticated } = useAuthStore();
 
@@ -149,21 +152,75 @@ export const BarcodeScanPage = () => {
   };
 
   /**
-   * ✅ 食品登録処理（将来実装）
+   * ✅ 食品登録処理（商品名検索 → 手動入力）
    */
   const handleFoodRegistration = async (result: BarcodeValidationResult) => {
-    // TODO: 食品登録機能の実装
     console.log("🍎 食品登録:", result);
 
-    if (action === "register") {
-      // 食品を直接登録（将来実装）
-      alert(
-        `🍎 商品コード「${result.formattedCode}」を検出しました（食品登録機能は準備中）`
+    try {
+      if (action === "register") {
+        // 商品名を検索
+        const lookupResult = await lookupFoodByBarcode(
+          result.cleanCode,
+          result.type as "JAN" | "EAN"
+        );
+
+        if (lookupResult.found) {
+          // 商品情報が見つかった場合 → 手動入力ページに商品情報付きで遷移
+          const params = new URLSearchParams({
+            from: "scan",
+            barcode: result.cleanCode,
+            barcodeType: result.type,
+            name: lookupResult.name,
+          });
+
+          // quantity と unit が取得できた場合は追加
+          if (lookupResult.quantity) {
+            params.append("quantity", lookupResult.quantity.toString());
+          }
+          if (lookupResult.unit) {
+            params.append("unit", lookupResult.unit);
+          }
+
+          navigate(`/add-food?${params.toString()}`);
+        } else {
+          // 商品情報が見つからない場合の確認
+          const shouldManualInput = confirm(
+            `❌ 商品情報が見つかりませんでした\nバーコード: ${result.formattedCode}\n\n手動入力で食品を追加しますか？`
+          );
+
+          if (shouldManualInput) {
+            // バーコード情報のみで手動入力ページに遷移
+            navigate(
+              `/add-food?from=scan&barcode=${result.cleanCode}&barcodeType=${result.type}`
+            );
+          } else {
+            setIsProcessing(false);
+            setLastScannedCode(null);
+          }
+        }
+      } else if (action === "search") {
+        // 食品検索結果へリダイレクト（将来実装）
+        navigate(`/food-search?code=${result.cleanCode}&from=scan`);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "商品情報の取得中にエラーが発生しました";
+      console.error("食品処理エラー:", error);
+
+      // エラーハンドリング: 手動入力への誘導
+      const shouldRetry = confirm(
+        `❌ ${errorMessage}\n\n手動入力で食品を追加しますか？`
       );
-      navigate("/add-food");
-    } else if (action === "search") {
-      // 食品検索結果へリダイレクト（将来実装）
-      navigate(`/food-search?code=${result.cleanCode}&from=scan`);
+
+      if (shouldRetry) {
+        navigate("/add-food");
+      } else {
+        setIsProcessing(false);
+        setLastScannedCode(null);
+      }
     }
   };
 
@@ -339,6 +396,28 @@ export const BarcodeScanPage = () => {
         </div>
       </GlassCard>
 
+      {/* ✅ 食品登録中の全画面ローディング */}
+      {isLookingUpByBarcode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <GlassCard className="p-8 max-w-md mx-4">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-6"></div>
+              <h3 className="text-xl font-light text-gray-800 mb-4">
+                🛒 商品情報を取得中...
+              </h3>
+              <p className="text-gray-600 text-sm">
+                バーコードから商品名を検索しています
+              </p>
+              {lastScannedCode && (
+                <p className="text-gray-500 text-xs mt-2">
+                  バーコード: {lastScannedCode}
+                </p>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+      )}
+
       {/* ✅ 書籍登録中の全画面ローディング */}
       {isRegisteringByISBN && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -362,7 +441,7 @@ export const BarcodeScanPage = () => {
       )}
 
       {/* ✅ 汎用処理中ローディング */}
-      {isProcessing && !isRegisteringByISBN && (
+      {isProcessing && !isRegisteringByISBN && !isLookingUpByBarcode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <GlassCard className="p-8 max-w-md mx-4">
             <div className="text-center">
