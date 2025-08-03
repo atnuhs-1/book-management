@@ -10,6 +10,7 @@ import {
   formatFoodError,
   formatErrorMessage,
   logError,
+  type FoodErrorResult,
 } from "../utils/errorFormatter";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -185,14 +186,40 @@ export const useFoodStore = create<FoodStore>()(
       } catch (error: unknown) {
         console.error("食品作成エラー:", error);
 
-        // ✅ errorFormatterを使用した型安全なエラーハンドリング
-        const errorResult = formatFoodError(error);
+        // ✅ 拡張されたformatFoodErrorを使用
+        const errorResult = formatFoodError(error) as FoodErrorResult;
         logError(error, "foodStore.createFood");
+
+        console.log("🔍 createFood errorResult:", errorResult); // ← 追加
+        console.log("🔍 needsConfirmation:", errorResult.needsConfirmation); // ← 追加
+        console.log("🔍 canForce:", errorResult.canForce); // ← 追加
 
         if (errorResult.isAuthError) {
           get().setAuthError(errorResult.message);
           set({ isLoading: false });
           throw new Error("認証が必要です");
+        }
+        // ✅ 409エラーで確認が必要な場合の特別処理
+        else if (errorResult.needsConfirmation && errorResult.canForce) {
+          console.log("✅ 確認ダイアログ用エラーを作成");
+          set({ isLoading: false });
+
+          // ✅ 専用のエラークラスでUIに情報を渡す
+          const confirmationError = new Error(errorResult.message) as Error & {
+            needsConfirmation: boolean;
+            confirmationMessage: string;
+            canForce: boolean;
+            originalFoodData: FoodCreate;
+          };
+
+          confirmationError.needsConfirmation = true;
+          confirmationError.confirmationMessage =
+            errorResult.confirmationMessage || errorResult.message;
+          confirmationError.canForce = true;
+          confirmationError.originalFoodData = foodData;
+
+          console.log("✅ confirmationError created:", confirmationError);
+          throw confirmationError;
         } else {
           set({
             error: errorResult.message,

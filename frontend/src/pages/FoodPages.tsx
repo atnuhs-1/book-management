@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard, GlassInput } from "../components/ui/GlassUI";
 import { useAuthStore } from "../stores/authStore";
 import { FOOD_UNITS, type Food } from "../types/food";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { fetchWithAuth, getApiUrl } from "../utils/fetchWrapper"; // ✅ 追加
 
 const foodCategories = [
   { id: "all", name: "すべて", icon: "🍽️" },
@@ -30,9 +29,17 @@ export const FoodPage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [foodItems, setFoodItems] = useState<Food[]>([]);
-  const [daysLeftMap, setDaysLeftMap] = useState<{ [foodId: number]: number | null }>({});
+  const [daysLeftMap, setDaysLeftMap] = useState<{
+    [foodId: number]: number | null;
+  }>({});
   const [editingItem, setEditingItem] = useState<Food | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", category: "", quantity: "", unit: "g", expiration_date: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    quantity: "",
+    unit: "g",
+    expiration_date: "",
+  });
   const [forceEditConfirmVisible, setForceEditConfirmVisible] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState("");
   const [sortOrder, setSortOrder] = useState("created_at");
@@ -40,17 +47,18 @@ export const FoodPage = () => {
   useEffect(() => {
     const fetchFoods = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/me/foods`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✅ fetchWithAuth を使用
+        const res = await fetchWithAuth(getApiUrl("/api/me/foods"), token!);
         if (!res.ok) throw new Error("食品の取得に失敗しました");
         const data = await res.json();
         setFoodItems(data);
       } catch (err) {
-        console.error(err);
+        console.error("❌ 食品取得エラー:", err);
       }
     };
-    fetchFoods();
+    if (token) {
+      fetchFoods();
+    }
   }, [token]);
 
   useEffect(() => {
@@ -59,9 +67,11 @@ export const FoodPage = () => {
       await Promise.all(
         foodItems.map(async (item) => {
           try {
-            const res = await fetch(`${API_BASE_URL}/foods/${item.id}/days_left`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            // ✅ fetchWithAuth を使用
+            const res = await fetchWithAuth(
+              getApiUrl(`/api/foods/${item.id}/days_left`),
+              token!
+            );
             if (!res.ok) throw new Error();
             const data = await res.json();
             newDaysMap[item.id] = data.days_left;
@@ -72,7 +82,9 @@ export const FoodPage = () => {
       );
       setDaysLeftMap(newDaysMap);
     };
-    if (foodItems.length > 0) fetchAllDaysLeft();
+    if (foodItems.length > 0 && token) {
+      fetchAllDaysLeft();
+    }
   }, [foodItems, token]);
 
   const handleEdit = (item: Food) => {
@@ -87,16 +99,16 @@ export const FoodPage = () => {
   };
 
   const handleUpdate = async (force = false) => {
-    if (!editingItem) return;
+    if (!editingItem || !token) return;
     try {
-      const url = new URL(`${API_BASE_URL}/api/foods/${editingItem.id}`);
+      const url = new URL(getApiUrl(`/api/foods/${editingItem.id}`));
       if (force) url.searchParams.set("force", "true");
 
-      const res = await fetch(url.toString(), {
+      // ✅ fetchWithAuth を使用
+      const res = await fetchWithAuth(url.toString(), token, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: editForm.name.trim(),
@@ -111,7 +123,10 @@ export const FoodPage = () => {
         let errorDetail = "更新に失敗しました";
         try {
           const errJson = await res.json();
-          if (res.status === 409 && errJson.detail?.includes("分類されません")) {
+          if (
+            res.status === 409 &&
+            errJson.detail?.includes("分類されません")
+          ) {
             setEditErrorMessage(errJson.detail);
             setForceEditConfirmVisible(true);
             return;
@@ -124,11 +139,14 @@ export const FoodPage = () => {
       }
 
       const updated = await res.json();
-      setFoodItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setFoodItems((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
       setEditingItem(null);
+      setForceEditConfirmVisible(false);
       alert("✅ 食品を更新しました");
     } catch (error) {
-      console.error(error);
+      console.error("❌ 更新エラー:", error);
       let errorMessage = "更新に失敗しました";
 
       if (error instanceof Error) {
@@ -145,22 +163,25 @@ export const FoodPage = () => {
 
   const handleDelete = async (id: number) => {
     const confirmDelete = window.confirm("この食品を削除しますか？");
-    if (!confirmDelete) return;
+    if (!confirmDelete || !token) return;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/foods/${id}`, {
+      // ✅ fetchWithAuth を使用
+      const res = await fetchWithAuth(getApiUrl(`/api/foods/${id}`), token, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("削除に失敗しました");
       setFoodItems((prev) => prev.filter((item: Food) => item.id !== id));
+      alert("✅ 食品を削除しました");
     } catch (err) {
-      console.error(err);
+      console.error("❌ 削除エラー:", err);
       alert("削除に失敗しました");
     }
   };
 
-  const currentCategoryName = foodCategories.find((c) => c.id === selectedCategory)?.name;
+  const currentCategoryName = foodCategories.find(
+    (c) => c.id === selectedCategory
+  )?.name;
   const filteredItems = foodItems
     .filter(
       (item) =>
@@ -169,9 +190,13 @@ export const FoodPage = () => {
     )
     .sort((a, b) => {
       if (sortOrder === "created_at") {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
       } else if (sortOrder === "days_left") {
-        return (daysLeftMap[a.id] ?? Infinity) - (daysLeftMap[b.id] ?? Infinity);
+        return (
+          (daysLeftMap[a.id] ?? Infinity) - (daysLeftMap[b.id] ?? Infinity)
+        );
       } else {
         return 0;
       }
@@ -227,11 +252,11 @@ export const FoodPage = () => {
                   backgroundColor:
                     daysLeftMap[item.id] != null
                       ? daysLeftMap[item.id]! < 0
-                        ? '#f87171'
+                        ? "#f87171"
                         : daysLeftMap[item.id]! <= 3
-                        ? '#fbbf24'
-                        : '#34d399'
-                      : '#d1d5db',
+                          ? "#fbbf24"
+                          : "#34d399"
+                      : "#d1d5db",
                 }}
               />
             </div>
@@ -244,7 +269,9 @@ export const FoodPage = () => {
               </div>
               <div className="flex justify-between">
                 <span>期限</span>
-                <span className="text-gray-800 font-medium">{item.expiration_date}</span>
+                <span className="text-gray-800 font-medium">
+                  {item.expiration_date}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>期限まで</span>
@@ -252,8 +279,8 @@ export const FoodPage = () => {
                   {daysLeftMap[item.id] != null
                     ? daysLeftMap[item.id]! >= 0
                       ? `あと ${daysLeftMap[item.id]} 日`
-                      : '期限切れ'
-                    : '取得中...'}
+                      : "期限切れ"
+                    : "取得中..."}
                 </span>
               </div>
             </div>
@@ -278,14 +305,18 @@ export const FoodPage = () => {
       {editingItem && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-800">食品情報の編集</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              食品情報の編集
+            </h2>
             <div className="space-y-3">
               <label className="block">
                 <span className="text-sm text-gray-600">食品名</span>
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 />
               </label>
@@ -293,7 +324,9 @@ export const FoodPage = () => {
                 <span className="text-sm text-gray-600">カテゴリ</span>
                 <select
                   value={editForm.category}
-                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, category: e.target.value })
+                  }
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 >
                   {foodCategories
@@ -310,7 +343,9 @@ export const FoodPage = () => {
                 <input
                   type="number"
                   value={editForm.quantity}
-                  onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, quantity: e.target.value })
+                  }
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 />
               </label>
@@ -318,7 +353,9 @@ export const FoodPage = () => {
                 <span className="text-sm text-gray-600">単位</span>
                 <select
                   value={editForm.unit}
-                  onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, unit: e.target.value })
+                  }
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 >
                   {FOOD_UNITS.map((unit) => (
@@ -333,7 +370,12 @@ export const FoodPage = () => {
                 <input
                   type="date"
                   value={editForm.expiration_date}
-                  onChange={(e) => setEditForm({ ...editForm, expiration_date: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      expiration_date: e.target.value,
+                    })
+                  }
                   className="mt-1 w-full rounded border-gray-300 shadow-sm"
                 />
               </label>
