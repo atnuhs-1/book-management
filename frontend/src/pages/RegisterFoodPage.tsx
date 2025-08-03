@@ -1,14 +1,13 @@
-// frontend/src/pages/RegisterFoodPage.tsx - errorFormatter対応版
+// frontend/src/pages/RegisterFoodPage.tsx - BarcodeScanPage連携版
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   GlassCard,
   GlassInput,
   GlassButton,
   GlassError,
 } from "../components/ui/GlassUI";
-import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
 import { useAuthStore } from "../stores/authStore";
 import { useFoodStore } from "../stores/foodStore";
 import type { FoodCreate, FoodCategory, FoodUnit } from "../types/food";
@@ -17,7 +16,6 @@ import {
   calculateDefaultExpirationDate,
   validateFoodData,
 } from "../utils/foodUtils";
-import type { BarcodeValidationResult } from "../utils/barcodeValidator";
 
 // ✅ errorFormatterをインポート
 import { formatFoodError, logError } from "../utils/errorFormatter";
@@ -78,22 +76,24 @@ interface ConfirmationState {
 export const RegisterFoodPage = () => {
   const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // ✅ 新しい確認ダイアログ状態（シンプル化）
+  // ✅ バーコードスキャンからの戻り処理
+  const fromScan = searchParams.get("from") === "scan";
+  const scannedBarcode = searchParams.get("barcode");
+  const barcodeType = searchParams.get("barcodeType") as "JAN" | "EAN" | null;
+  const scannedName = searchParams.get("name");
+  const scannedQuantity = searchParams.get("quantity");
+  const scannedUnit = searchParams.get("unit");
+
+  // ✅ 確認ダイアログ状態
   const [confirmation, setConfirmation] = useState<ConfirmationState>({
     isVisible: false,
     message: "",
     foodData: null,
   });
 
-  const {
-    createFood,
-    createFoodByBarcode,
-    isLoading,
-    isRegisteringByBarcode,
-    error,
-    setError,
-  } = useFoodStore();
+  const { createFood, isLoading, error, setError } = useFoodStore();
 
   const [mode, setMode] = useState<"manual" | "barcode" | null>(null);
   const [food, setFood] = useState<Partial<FoodItem>>({
@@ -102,7 +102,45 @@ export const RegisterFoodPage = () => {
   });
   const [showUnitModal, setShowUnitModal] = useState(false);
 
-  // 未認証の場合のガード（変更なし）
+  // ✅ バーコードスキャンからの戻り時の処理
+  useEffect(() => {
+    if (fromScan && scannedBarcode && barcodeType) {
+      // バーコード情報と取得できた商品情報をフォームに設定
+      const foodData: Partial<FoodItem> = {
+        barcode: scannedBarcode,
+        barcode_type: barcodeType,
+        quantity: scannedQuantity || "1",
+        unit: scannedUnit || "個",
+      };
+
+      // 商品名が取得できた場合は設定
+      if (scannedName) {
+        foodData.name = scannedName;
+
+        // 商品名から推定カテゴリを設定
+        const suggestedCategory = suggestCategoryFromName(scannedName);
+        if (suggestedCategory) {
+          foodData.category = suggestedCategory;
+        }
+      }
+
+      setFood(foodData);
+      setMode("manual");
+
+      // URLをクリーンアップ
+      navigate("/add-food", { replace: true });
+    }
+  }, [
+    fromScan,
+    scannedBarcode,
+    barcodeType,
+    scannedName,
+    scannedQuantity,
+    scannedUnit,
+    navigate,
+  ]);
+
+  // 未認証の場合のガード
   if (!isAuthenticated) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -137,71 +175,9 @@ export const RegisterFoodPage = () => {
     );
   }
 
-  // ✅ バーコードスキャン成功時の処理（errorFormatter対応）
-  const handleBarcodeSuccess = async (result: BarcodeValidationResult) => {
-    console.log("🎯 バーコードスキャン成功:", result);
-
-    try {
-      // JAN/EANのみサポート
-      if (result.type !== "JAN" && result.type !== "EAN") {
-        alert("❌ 食品のバーコード（JAN/EAN）のみサポートしています");
-        return;
-      }
-
-      const registeredFood = await createFoodByBarcode(
-        result.cleanCode,
-        result.type as "JAN" | "EAN"
-      );
-
-      alert(`🛒 「${registeredFood.name}」を登録しました！`);
-      setMode(null);
-      setFood({ quantity: "1", unit: "個" });
-    } catch (error: unknown) {
-      console.error("食品登録エラー:", error);
-
-      // ✅ errorFormatterを使用した詳細エラーハンドリング
-      const errorResult = formatFoodError(error);
-      logError(error, "RegisterFoodPage.handleBarcodeSuccess");
-
-      // 認証エラーの場合
-      if (errorResult.isAuthError) {
-        alert("セッションが期限切れです。再度ログインしてください。");
-        navigate("/login");
-        return;
-      }
-
-      // 商品情報が見つからない場合
-      if (
-        errorResult.status === 404 ||
-        errorResult.message.includes("商品情報が見つかりませんでした")
-      ) {
-        const shouldManualInput = confirm(
-          `商品情報が見つかりませんでした。\nバーコード: ${result.formattedCode}\n\n手動入力で追加しますか？`
-        );
-
-        if (shouldManualInput) {
-          setFood({
-            quantity: "1",
-            unit: "個",
-            barcode: result.cleanCode,
-            barcode_type: result.type as "JAN" | "EAN",
-          });
-          setMode("manual");
-        } else {
-          setMode(null);
-        }
-      } else {
-        // その他のエラー
-        alert(`❌ 登録に失敗しました: ${errorResult.message}`);
-
-        const shouldRetry = confirm("手動入力で食品を追加しますか？");
-        if (shouldRetry) {
-          setMode("manual");
-        } else {
-          setMode(null);
-        }
-      }
-    }
+  // ✅ バーコードスキャンページに遷移
+  const handleBarcodeNavigation = () => {
+    navigate("/barcode-scan?mode=food&action=register&returnTo=/add-food");
   };
 
   const handleChange = (field: keyof FoodItem, value: string) => {
@@ -266,20 +242,8 @@ export const RegisterFoodPage = () => {
         );
       };
 
-      console.log("🔍 error type check:", {
-        isError: error instanceof Error,
-        hasNeedsConfirmation:
-          error && typeof error === "object" && "needsConfirmation" in error,
-        hasConfirmationMessage:
-          error && typeof error === "object" && "confirmationMessage" in error,
-        hasCanForce: error && typeof error === "object" && "canForce" in error,
-        hasOriginalData:
-          error && typeof error === "object" && "originalFoodData" in error,
-      }); // ← デバッグログ追加
-
       // ✅ 確認が必要な409エラーの場合
       if (isConfirmationError(error)) {
-        console.log("✅ 確認ダイアログを表示"); // デバッグログ
         setConfirmation({
           isVisible: true,
           message: error.confirmationMessage,
@@ -349,7 +313,7 @@ export const RegisterFoodPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-24 md:pb-8">
-      {/* ヘッダー（変更なし） */}
+      {/* ヘッダー */}
       <div className="text-center">
         <h1 className="text-4xl font-light text-gray-800 mb-4">
           🛒 食品を追加
@@ -359,12 +323,13 @@ export const RegisterFoodPage = () => {
         </p>
       </div>
 
-      {/* 方法選択カード（変更なし） */}
+      {/* 方法選択カード */}
       {!mode && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* ✅ バーコードスキャンカード - BarcodeScanPageに遷移 */}
           <div
             className={`group cursor-pointer transition-all duration-500`}
-            onClick={() => setMode("barcode")}
+            onClick={handleBarcodeNavigation}
           >
             <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-1 hover:bg-white/40 transition-all duration-500">
               <div className="flex items-center mb-4">
@@ -408,18 +373,7 @@ export const RegisterFoodPage = () => {
         </div>
       )}
 
-      {/* バーコードスキャン機能（変更なし） */}
-      {mode === "barcode" && (
-        <BarcodeScanner
-          supportedTypes={["JAN", "EAN"]}
-          onBarcodeDetected={handleBarcodeSuccess}
-          onClose={() => setMode(null)}
-          title="🛒 食品バーコードスキャン"
-          subtitle="商品のJAN/EANバーコードをカメラに向けてください"
-        />
-      )}
-
-      {/* 手動入力フォーム（ほぼ変更なし、エラーハンドリングのみ修正済み） */}
+      {/* 手動入力フォーム */}
       {mode === "manual" && (
         <GlassCard className="p-6 space-y-4">
           <h2 className="text-2xl font-light text-gray-800 flex items-center">
@@ -427,6 +381,7 @@ export const RegisterFoodPage = () => {
             手動入力
           </h2>
 
+          {/* ✅ バーコード情報表示（バーコードスキャンから戻ってきた場合） */}
           {food.barcode && (
             <div className="mb-4 p-3 bg-blue-50/50 backdrop-blur-sm rounded-xl border border-blue-200/30">
               <div className="text-sm text-blue-800">
@@ -434,6 +389,16 @@ export const RegisterFoodPage = () => {
                 <div className="mt-1 font-mono text-xs">
                   {food.barcode_type}: {food.barcode}
                 </div>
+                {scannedName ? (
+                  <div className="mt-2 text-xs text-blue-600">
+                    ✅
+                    商品情報が取得できました。不足している情報を入力してください。
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-blue-600">
+                    商品情報が見つからなかったため、手動で入力してください
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -573,7 +538,7 @@ export const RegisterFoodPage = () => {
         </GlassCard>
       )}
 
-      {/* 単位選択モーダル（変更なし、省略） */}
+      {/* 単位選択モーダル（既存のまま - 省略） */}
       {showUnitModal && (
         <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6 space-y-4">
@@ -581,7 +546,6 @@ export const RegisterFoodPage = () => {
               単位を選択
             </h2>
 
-            {/* 単位カテゴリ別に表示 */}
             <div className="space-y-4">
               {/* 個数系 */}
               <div>
@@ -678,26 +642,7 @@ export const RegisterFoodPage = () => {
         </div>
       )}
 
-      {/* ヘルプセクション（変更なし、省略） */}
-
-      {/* バーコードスキャン中ローディング（変更なし） */}
-      {isRegisteringByBarcode && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <GlassCard className="p-8 max-w-md mx-4">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-              <h3 className="text-xl font-light text-gray-800 mb-4">
-                🛒 食品を登録しています...
-              </h3>
-              <p className="text-gray-600 text-sm">
-                商品データベースから商品情報を取得中です
-              </p>
-            </div>
-          </GlassCard>
-        </div>
-      )}
-
-      {/* ✅ 改善された確認ダイアログ */}
+      {/* ✅ 確認ダイアログ */}
       {confirmation.isVisible && confirmation.foodData && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <GlassCard className="p-8 max-w-md mx-4">
@@ -740,3 +685,4 @@ export const RegisterFoodPage = () => {
     </div>
   );
 };
+

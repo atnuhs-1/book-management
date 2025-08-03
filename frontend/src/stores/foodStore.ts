@@ -13,6 +13,14 @@ import {
   type FoodErrorResult,
 } from "../utils/errorFormatter";
 
+// ✅ 新規追加: 商品名検索結果の型
+interface ProductLookupResult {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  found: boolean;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface FoodStore {
@@ -28,6 +36,8 @@ interface FoodStore {
   // 認証関連エラーの状態
   lastAuthError: string | null;
   hasAuthError: boolean;
+
+  isLookingUpByBarcode: boolean;
 
   // 基本アクション
   setFoods: (foods: Food[]) => void;
@@ -60,6 +70,12 @@ interface FoodStore {
     barcode: string,
     type: "JAN" | "EAN"
   ) => Promise<ProductInfo | null>;
+
+  setLookingUpByBarcode: (looking: boolean) => void;
+  lookupFoodByBarcode: (
+    barcode: string,
+    type: "JAN" | "EAN"
+  ) => Promise<ProductLookupResult>;
 }
 
 // ✅ 既存のformatErrorMessage関数を削除（errorFormatterを使用）
@@ -74,10 +90,13 @@ export const useFoodStore = create<FoodStore>()(
     hasAuthError: false,
     isRegisteringByBarcode: false,
     lastScannedBarcode: null,
+    isLookingUpByBarcode: false,
 
     // 基本アクション
     setFoods: (foods) => set({ foods }),
     addFood: (food) => set((state) => ({ foods: [...state.foods, food] })),
+
+    setLookingUpByBarcode: (looking) => set({ isLookingUpByBarcode: looking }),
 
     updateFood: (updatedFood) =>
       set((state) => ({
@@ -396,6 +415,60 @@ export const useFoodStore = create<FoodStore>()(
         // その他のエラーはログに記録してnullを返す
         set({ error: errorResult.message });
         return null;
+      }
+    },
+
+    // ✅ 新規追加: バーコードから商品名取得
+    lookupFoodByBarcode: async (
+      barcode: string,
+      type: "JAN" | "EAN"
+    ): Promise<ProductLookupResult> => {
+      set({
+        isLookingUpByBarcode: true,
+        error: null,
+        lastScannedBarcode: barcode,
+      });
+
+      try {
+        console.log(`🔍 ${type}バーコードで商品名検索:`, barcode);
+
+        const response = await axios.get(`${API_BASE_URL}/foods/lookup_name`, {
+          params: { barcode, type },
+        });
+
+        const result = response.data;
+        console.log("✅ 商品名取得成功:", result);
+
+        set({ isLookingUpByBarcode: false });
+        get().clearAuthError();
+
+        return {
+          name: result.name,
+          quantity: result.quantity,
+          unit: result.unit,
+          found: true,
+        };
+      } catch (error: unknown) {
+        console.error("❌ 商品名取得エラー:", error);
+
+        const errorResult = formatErrorMessage(error);
+        logError(error, "foodStore.lookupFoodByBarcode");
+
+        set({
+          isLookingUpByBarcode: false,
+          error: errorResult.message,
+        });
+
+        // 404の場合は商品が見つからないだけなので、foundをfalseで返す
+        if (isAxiosError(error) && error.response?.status === 404) {
+          return {
+            name: "",
+            found: false,
+          };
+        }
+
+        // その他のエラーの場合は例外を投げる
+        throw new Error(errorResult.message);
       }
     },
   }))
