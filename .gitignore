@@ -35,13 +35,11 @@ yarn-error.log*
 frontend/dist/
 frontend/build/
 
-# Environment variables
+# Environment variables (ローカル開発用のみ除外)
 .env
 .env.local
-.env.development
 .env.development.local
-.env.production
-.env.production.local
+# ✅ .env.production は除外しない（Vercelが必要な場合があるため）
 
 # Docker
 .docker/
@@ -78,31 +76,30 @@ htmlcov/
 .tox/
 .nox/
 
-# PWA generated files
+# PWA generated files (自動生成されるもののみ除外)
 frontend/public/sw.js
 frontend/public/workbox-*.js
-frontend/public/manifest.json
+# ✅ manifest.json は除外しない（手動作成するため）
 
-# バーコード・画像ファイル
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.tiff
-*.webp
+# 一時的な画像ファイル（アップロード用）
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+backend/uploads/*.gif
+backend/receipts/*.jpg
+backend/receipts/*.jpeg
+backend/receipts/*.png
 
-# 一時ファイル
-*.tmp
-*.temp
-temp/
-tmp/
+# ✅ PWA用の静的アセットは保持
+!frontend/public/*.png
+!frontend/public/*.jpg
+!frontend/public/*.ico
+!frontend/public/manifest.json
 
 # API keys and sensitive data
 **/secrets/
 **/*secret*
 **/*key*
-# **/*token*
 !**/package.json
 !**/pyproject.toml
 
@@ -137,7 +134,6 @@ tmp/
 # Vim
 *.swp
 *.swo
-*~
 
 # Emacs
 *~
@@ -150,10 +146,10 @@ tramp
 .\#*
 
 # Project specific
-# 開発中に生成される書籍カバー画像
+# 開発中に生成される書籍カバー画像（動的生成）
 frontend/public/covers/
 backend/static/covers/
 
-# OCRで処理したレシート画像
+# OCRで処理したレシート画像（アップロード）
 backend/receipts/
 frontend/src/assets/receipts/
