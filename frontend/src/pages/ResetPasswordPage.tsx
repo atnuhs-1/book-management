@@ -1,7 +1,14 @@
 // src/pages/ResetPasswordPage.tsx
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+
+// APIエラーレスポンスの型定義
+interface ApiErrorResponse {
+  detail: string | Array<{ msg: string; type: string }>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
@@ -20,19 +27,37 @@ export const ResetPasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      await axios.post("http://localhost:8000/api/auth/reset-password", {
+      await axios.post(`${API_BASE_URL}/auth/reset-password`, {
         token,
         new_password: newPassword,
       });
       setMessage("パスワードを再設定しました。ログインしてください。");
       setTimeout(() => navigate("/login"), 3000);
-    } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        (Array.isArray(err.response?.data?.detail) &&
-          err.response.data.detail[0]?.msg) ||
-        "パスワード再設定に失敗しました。";
-      setError(detail);
+    } catch (error) {
+      let errorMessage = "パスワード再設定に失敗しました。";
+
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as
+          | ApiErrorResponse
+          | undefined;
+
+        if (responseData?.detail) {
+          if (typeof responseData.detail === "string") {
+            errorMessage = responseData.detail;
+          } else if (
+            Array.isArray(responseData.detail) &&
+            responseData.detail.length > 0
+          ) {
+            errorMessage = responseData.detail[0]?.msg || errorMessage;
+          }
+        } else if (error.message) {
+          errorMessage = `ネットワークエラー: ${error.message}`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

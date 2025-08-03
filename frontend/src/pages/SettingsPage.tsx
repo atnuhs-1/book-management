@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom"; // 🔹追加
+
+// APIエラーレスポンスの型定義
+interface ApiErrorResponse {
+  detail: string | Array<{ msg: string; type: string }>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const SettingsPage = () => {
   const { theme, toggleTheme } = useThemeStore();
@@ -23,11 +30,9 @@ export const SettingsPage = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  const API_BASE = "http://localhost:8000";
-
   useEffect(() => {
     axios
-      .get(`${API_BASE}/api/auth/me`, {
+      .get(`${API_BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -51,7 +56,7 @@ export const SettingsPage = () => {
 
     try {
       await axios.put(
-        `${API_BASE}/api/auth/users/me`,
+        `${API_BASE_URL}/auth/users/me`,
         { username, email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -80,7 +85,7 @@ export const SettingsPage = () => {
     setChangingPassword(true);
     try {
       await axios.put(
-        `${API_BASE}/api/auth/users/me/password`,
+        `${API_BASE_URL}/auth/users/me/password`,
         {
           current_password: currentPassword,
           new_password: newPassword,
@@ -92,14 +97,33 @@ export const SettingsPage = () => {
       alert("パスワードを変更しました！");
       setCurrentPassword("");
       setNewPassword("");
-    } catch (err: any) {
-      console.error("パスワード変更失敗:", err.response?.data || err);
-      const detail =
-        err.response?.data?.detail ||
-        (Array.isArray(err.response?.data?.detail) &&
-          err.response.data.detail[0]?.msg) ||
-        "パスワードの変更に失敗しました";
-      alert(detail);
+    } catch (error) {
+      console.error("パスワード変更失敗:", error);
+
+      let errorMessage = "パスワードの変更に失敗しました";
+
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as
+          | ApiErrorResponse
+          | undefined;
+
+        if (responseData?.detail) {
+          if (typeof responseData.detail === "string") {
+            errorMessage = responseData.detail;
+          } else if (
+            Array.isArray(responseData.detail) &&
+            responseData.detail.length > 0
+          ) {
+            errorMessage = responseData.detail[0]?.msg || errorMessage;
+          }
+        } else if (error.message) {
+          errorMessage = `ネットワークエラー: ${error.message}`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      alert(errorMessage);
     } finally {
       setChangingPassword(false);
     }

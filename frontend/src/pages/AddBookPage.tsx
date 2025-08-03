@@ -13,10 +13,26 @@ import {
   GlassLoading,
 } from "../components/ui/GlassUI";
 import { BarcodeScanner } from "../components/barcode/BarcodeScanner";
+import { PLACEHOLDER_IMAGE } from "../constants/images";
+
+// エラーメッセージを取得するヘルパー関数
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return "An unknown error occurred";
+};
 
 export const AddBookPage = () => {
   const [selectedMethod, setSelectedMethod] = useState<
-  "barcode" | "search" | "manual" | null >(null);
+    "barcode" | "search" | "manual" | null
+  >(null);
 
   // ✅ bookStoreから機能を取得
   const {
@@ -48,6 +64,8 @@ export const AddBookPage = () => {
   const [searchTitle, setSearchTitle] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
 
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+
   // ✅ バーコードスキャン成功時の処理
   const handleBarcodeSuccess = async (isbn: string) => {
     console.log("🎯 バーコードスキャン成功:", isbn);
@@ -56,9 +74,10 @@ export const AddBookPage = () => {
       const registeredBook = await createBookByISBN(isbn);
       alert(`📚 「${registeredBook.title}」を登録しました！`);
       navigate("/book-list");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("書籍登録エラー:", error);
-      alert(`❌ 登録に失敗しました: ${error.message}`);
+      const errorMessage = getErrorMessage(error);
+      alert(`❌ 登録に失敗しました: ${errorMessage}`);
       const shouldRetry = confirm("手動入力で書籍を追加しますか？");
       if (shouldRetry) {
         setSelectedMethod("manual");
@@ -79,7 +98,7 @@ export const AddBookPage = () => {
     try {
       await searchBooksByTitleForRegistration(searchTitle.trim());
       setHasSearched(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("検索エラー:", error);
       alert("検索に失敗しました。再度お試しください。");
     }
@@ -101,12 +120,14 @@ export const AddBookPage = () => {
       setSearchTitle("");
       setHasSearched(false);
       clearTitleSearchResults();
+      setImageErrors({});
       setSelectedMethod(null);
 
       navigate("/book-list");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("書籍登録エラー:", error);
-      alert(`❌ 登録に失敗しました: ${error.message}`);
+      const errorMessage = getErrorMessage(error);
+      alert(`❌ 登録に失敗しました: ${errorMessage}`);
     }
   };
 
@@ -199,9 +220,6 @@ export const AddBookPage = () => {
     <div className="max-w-4xl mx-auto space-y-8">
       {/* ヘッダー */}
       <div className="text-center">
-        <h1 className="text-4xl font-light text-gray-800 mb-4">
-          📚 書籍を追加
-        </h1>
         <p className="text-gray-600 text-lg">
           書籍を追加する方法を選択してください
         </p>
@@ -350,6 +368,7 @@ export const AddBookPage = () => {
                       setSearchTitle("");
                       setHasSearched(false);
                       clearTitleSearchResults();
+                      setImageErrors({});
                     }}
                     disabled={isTitleSearching}
                     className="px-3"
@@ -390,6 +409,7 @@ export const AddBookPage = () => {
                   setSearchTitle("");
                   setHasSearched(false);
                   clearTitleSearchResults();
+                  setImageErrors({});
                 }}
                 disabled={isTitleSearching}
               >
@@ -410,6 +430,7 @@ export const AddBookPage = () => {
                   onClick={() => {
                     setHasSearched(false);
                     clearTitleSearchResults();
+                    setImageErrors({});
                   }}
                 >
                   結果をクリア
@@ -459,14 +480,19 @@ export const AddBookPage = () => {
                           <div className="flex-shrink-0">
                             <img
                               src={
-                                book.cover_image_url ||
-                                "https://via.placeholder.com/120x180?text=No+Image"
+                                imageErrors[index] || !book.cover_image_url
+                                  ? PLACEHOLDER_IMAGE
+                                  : book.cover_image_url
                               }
                               alt={book.title}
                               className="w-24 h-36 object-cover rounded-lg shadow-lg"
-                              onError={(e) => {
-                                e.currentTarget.src =
-                                  "https://via.placeholder.com/120x180?text=No+Image";
+                              onError={() => {
+                                if (!imageErrors[index]) {
+                                  setImageErrors((prev) => ({
+                                    ...prev,
+                                    [index]: true,
+                                  }));
+                                }
                               }}
                             />
                           </div>
@@ -479,9 +505,9 @@ export const AddBookPage = () => {
                             <div className="space-y-1 text-sm text-gray-600">
                               <p>
                                 <span className="font-medium">著者:</span>{" "}
-                                {Array.isArray(book.author)
-                                  ? book.author.join(", ")
-                                  : book.author || "不明"}
+                                {Array.isArray(book.authors)
+                                  ? book.authors.join(", ")
+                                  : book.authors || "不明"}
                               </p>
                               <p>
                                 <span className="font-medium">出版社:</span>{" "}

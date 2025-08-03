@@ -21,6 +21,8 @@ interface Recipe {
   ingredients?: Ingredient[];
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export const RecipePage = () => {
   const { token } = useAuthStore();
   const [expiringFoods, setExpiringFoods] = useState<FoodItem[]>([]);
@@ -38,7 +40,7 @@ export const RecipePage = () => {
       if (!token) return;
       setLoadingExpiring(true);
       try {
-        const res = await fetch("http://localhost:8000/api/foods/expiring_soon", {
+        const res = await fetch(`${API_BASE_URL}/foods/expiring_soon`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("期限間近の食品取得に失敗");
@@ -58,7 +60,7 @@ export const RecipePage = () => {
       if (!selectedFood || !token) return;
       setLoadingMain(true);
       try {
-        const res = await axios.get("http://localhost:8000/api/foods/recipe_by_main_food", {
+        const res = await axios.get(`${API_BASE_URL}/foods/recipe_by_main_food`, {
           headers: { Authorization: `Bearer ${token}` },
           params: { food_name: selectedFood },
         });
@@ -79,7 +81,7 @@ export const RecipePage = () => {
       if (!token) return;
       setLoadingSuggested(true);
       try {
-        const res = await axios.get("http://localhost:8000/api/foods/recipe_suggestions", {
+        const res = await axios.get(`${API_BASE_URL}/foods/recipe_suggestions`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const nested = res.data.recipes?.[0]?.recipes;

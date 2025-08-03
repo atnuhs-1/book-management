@@ -5,6 +5,13 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import type { LoginRequest, FormErrors } from "../types/auth";
 
+// location.stateの型定義
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+}
+
 export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,7 +27,7 @@ export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // リダイレクト先を取得（ログイン後に元のページに戻る）
-  const redirectTo = (location.state as any)?.from?.pathname || "/";
+  const redirectTo = (location.state as LocationState)?.from?.pathname || "/";
 
   // 既にログイン済みの場合はリダイレクト
   useEffect(() => {
@@ -72,7 +79,7 @@ export const LoginPage = () => {
     try {
       await login(formData);
       navigate(redirectTo, { replace: true });
-    } catch (error) {
+    } catch {
       // エラーは authStore で管理されるので、ここでは何もしない
     }
   };
@@ -165,7 +172,7 @@ export const LoginPage = () => {
                   disabled={isLoading}
                 >
                   {showPassword ? "🙈" : "👁️"}
-                </button>  
+                </button>
               </div>
               <p className="text-sm text-gray-600 mt-2">
                   パスワードをお忘れの方は

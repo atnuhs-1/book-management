@@ -22,7 +22,6 @@ export const Layout = ({ children }: LayoutProps) => {
     logout,
     isLoading,
     isTokenExpired,
-    lastAuthError,
   } = useAuthStore();
 
   // 共通のユーザーメニュー状態管理
@@ -112,6 +111,12 @@ export const Layout = ({ children }: LayoutProps) => {
           { label: "ホーム", path: "/" },
           { label: "書籍一覧", path: "/book-list" },
         ];
+      case "/search-books":
+        return [
+          { label: "ホーム", path: "/" },
+          { label: "書籍一覧", path: "/book-list" },
+          { label: "書籍検索", path: "/search-books" },
+        ];
       case "/wishlist":
         return [
           { label: "ホーム", path: "/" },
@@ -165,11 +170,15 @@ export const Layout = ({ children }: LayoutProps) => {
           <div className="flex items-center justify-between h-16">
             {/* ロゴ */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-sm">🏠</span>
+              <div className="w-9 h-9 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
+                <img
+                  src="/icon-512x512.jpg"
+                  alt="LibrEats Logo"
+                  className="rounded-md"
+                />
               </div>
               <h1 className="text-lg font-light text-gray-800">
-                Life Manager PWA
+                LibrEats
               </h1>
             </Link>
 
@@ -357,7 +366,7 @@ export const Layout = ({ children }: LayoutProps) => {
         {(location.pathname.startsWith("/food") ||
           location.pathname === "/expiry" ||
           location.pathname === "/add-food" ||
-          location.pathname === "/recipes" ) && (
+          location.pathname === "/recipes") && (
           <div className="max-w-6xl mx-auto mb-6">
             <div className="bg-white/20 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
               <div className="flex gap-2 overflow-x-auto">
@@ -387,6 +396,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
         {(location.pathname.startsWith("/book") ||
           location.pathname === "/wishlist" ||
+          location.pathname === "/search-books" ||
           location.pathname === "/add-book") && (
           <div className="max-w-6xl mx-auto mb-6">
             <div className="bg-white/20 backdrop-blur-xl rounded-2xl p-2 border border-white/20 shadow-lg">
@@ -394,6 +404,8 @@ export const Layout = ({ children }: LayoutProps) => {
                 {[
                   { id: "/book-list", label: "一覧", emoji: "📚" },
                   { id: "/wishlist", label: "ウィッシュリスト", emoji: "💫" },
+                  { id: "/search-books", label: "検索", emoji: "🔍" },
+                  { id: "/barcode-scan", label: "バーコード", emoji: "📷" },
                   { id: "/add-book", label: "追加", emoji: "➕" },
                 ].map((item) => (
                   <button
@@ -438,7 +450,7 @@ export const Layout = ({ children }: LayoutProps) => {
       )}
 
       {/* モバイルナビゲーション - 認証状態に応じて動的変更 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-t border-white/20 dark:border-gray-700 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/20 dark:bg-gray-900/80 backdrop-blur-xl border-t border-white/20 dark:border-gray-700 z-49">
         <div className="grid grid-cols-4 gap-2 p-4">
           {mobileNavigationItems.map((item) => (
             <GlassMobileTab

@@ -2,23 +2,19 @@ import re
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.crud import book as crud_book
 from app.models.book import Book, BookStatusEnum
 from app.models.user import User
 from app.schemas.book import BookCreate, BookOut, BookUpdate, ISBNRequest
+from app.services.google_books import (ensure_isbn_or_raise,
+                                       fetch_book_info_by_isbn,
+                                       normalize_title, search_books_by_title,
+                                       search_books_by_title_rakuten)
 from app.services.utils import extract_volume, parse_published_date
-from app.services.google_books import (
-    fetch_book_info_by_isbn,
-    search_books_by_title,
-    search_books_by_title_rakuten,
-    normalize_title,
-    ensure_isbn_or_raise,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -88,7 +84,17 @@ def register_book_by_title(
         raise HTTPException(status_code=404, detail=f"Google Booksに '{title}' の書籍が見つかりませんでした")
 
     # ✅ 最初の検索結果を採用（候補数が多ければ拡張可）
-    book_data = books[0]
+    # ✅ 入力されたタイトルとnormalizeして一致する本を探す
+    normalized_input = normalize_title(title)
+    matched_book = next(
+        (book for book in books if normalize_title(book["title"]) == normalized_input),
+        None
+    )
+
+    if not matched_book:
+        raise HTTPException(status_code=404, detail=f"'{title}' に完全一致する書籍が見つかりませんでした")
+
+    book_data = matched_book
 
     # ✅ ISBN補完（必要であれば楽天APIを使用）
     try:
@@ -188,9 +194,23 @@ def get_my_books(db: Session = Depends(get_db), current_user: User = Depends(get
     return crud_book.get_books_by_user_id_and_status(db, current_user.id, BookStatusEnum.OWNED)
 
 
+def isbn13_to_isbn10(isbn13: str) -> str | None:
+    if not isbn13.startswith("978") or len(isbn13) != 13 or not isbn13.isdigit():
+        return None
+
+    core = isbn13[3:-1]
+    total = sum((10 - i) * int(digit) for i, digit in enumerate(core))
+    remainder = 11 - (total % 11)
+    check_digit = 'X' if remainder == 10 else str(remainder % 11)
+    return core + check_digit
+
 @router.get("/me/wishlist", response_model=List[BookOut])
 def get_my_wishlist(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return crud_book.get_books_by_user_id_and_status(db, current_user.id, BookStatusEnum.WISHLIST)
+    books = crud_book.get_books_by_user_id_and_status(db, current_user.id, BookStatusEnum.WISHLIST)
+    for book in books:
+        isbn10 = isbn13_to_isbn10(book.isbn)
+        book.amazon_url = f"https://www.amazon.co.jp/dp/{isbn10}" if isbn10 else None
+    return books
 
 
 @router.get("/me/books/favorites", response_model=List[BookOut])

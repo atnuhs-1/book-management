@@ -100,10 +100,14 @@ export const SignupPage = () => {
 
     try {
       // confirmPasswordを除いてバックエンドに送信
-      const { confirmPassword, ...registerData } = formData;
+      const registerData = {
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+      };
       await register(registerData);
       navigate("/", { replace: true });
-    } catch (error) {
+    } catch {
       // エラーは authStore で管理されるので、ここでは何もしない
     }
   };

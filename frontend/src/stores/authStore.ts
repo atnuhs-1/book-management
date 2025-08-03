@@ -1,8 +1,8 @@
-// src/stores/authStore.ts
+// src/stores/authStore.ts - 型安全版（error: any修正）
 
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import type {
   User,
   LoginRequest,
@@ -10,8 +10,15 @@ import type {
   AuthResponse,
 } from "../types/auth";
 
+// ✅ errorFormatterをインポート
+import {
+  formatAuthError,
+  logError,
+} from "../utils/errorFormatter";
+
 // APIのベースURL
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 
 // 認証ストアの状態の型定義
 interface AuthStore {
@@ -23,7 +30,7 @@ interface AuthStore {
   error: string | null;
   isInitialized: boolean;
 
-  // ✅ 新機能: 期限切れ関連の状態
+  // ✅ 既存: 期限切れ関連の状態
   isTokenExpired: boolean;
   lastAuthError: string | null;
 
@@ -35,7 +42,7 @@ interface AuthStore {
   clearError: () => void;
   setInitialized: (initialized: boolean) => void;
 
-  // ✅ 新機能: 期限切れ関連のアクション
+  // ✅ 既存: 期限切れ関連のアクション
   setTokenExpired: (expired: boolean) => void;
   setLastAuthError: (error: string | null) => void;
 
@@ -50,17 +57,22 @@ interface AuthStore {
   setAuthHeader: (token: string) => void;
   clearAuthHeader: () => void;
 
-  // ✅ 新機能: エラーハンドリング
-  handleAuthError: (error: any) => boolean; // 認証エラーかどうかを返す
+  // ✅ 修正: 型安全なエラーハンドリング
+  handleAuthError: (error: unknown) => boolean; // unknown型に変更
 }
 
-// authStore.ts の parseAuthError 関数にログを追加
+// ✅ 型安全なparseAuthError関数（errorFormatter活用版）
 const parseAuthError = (
-  error: any
+  error: unknown
 ): { message: string; isTokenExpired: boolean; shouldLogout: boolean } => {
-  if (!error.response) {
+  // errorFormatterを使用して基本的な解析
+  const errorResult = formatAuthError(error);
+  logError(error, "authStore.parseAuthError");
+
+  // ネットワークエラーの場合
+  if (!isAxiosError(error) || !error.response) {
     return {
-      message: "ネットワークエラーが発生しました",
+      message: errorResult.message,
       isTokenExpired: false,
       shouldLogout: false,
     };
@@ -72,7 +84,10 @@ const parseAuthError = (
     const detail = data?.detail || "";
 
     // バックエンドからの期限切れメッセージを検出
-    if (detail.includes("有効期限が切れました") || detail.includes("expired")) {
+    if (
+      typeof detail === "string" &&
+      (detail.includes("有効期限が切れました") || detail.includes("expired"))
+    ) {
       return {
         message: "セッションの有効期限が切れました。再度ログインしてください。",
         isTokenExpired: true,
@@ -80,7 +95,10 @@ const parseAuthError = (
       };
     }
 
-    if (detail.includes("トークンが無効です") || detail.includes("invalid")) {
+    if (
+      typeof detail === "string" &&
+      (detail.includes("トークンが無効です") || detail.includes("invalid"))
+    ) {
       return {
         message: "認証情報が無効です。再度ログインしてください。",
         isTokenExpired: true,
@@ -88,7 +106,10 @@ const parseAuthError = (
       };
     }
 
-    if (detail.includes("ユーザーが見つかりません")) {
+    if (
+      typeof detail === "string" &&
+      detail.includes("ユーザーが見つかりません")
+    ) {
       return {
         message: "ユーザー情報が見つかりません。再度ログインしてください。",
         isTokenExpired: false,
@@ -97,14 +118,14 @@ const parseAuthError = (
     }
 
     return {
-      message: detail || "認証に失敗しました",
+      message: typeof detail === "string" ? detail : "認証に失敗しました",
       isTokenExpired: true,
       shouldLogout: true,
     };
   }
 
   return {
-    message: data?.detail || "エラーが発生しました",
+    message: errorResult.message,
     isTokenExpired: false,
     shouldLogout: false,
   };
@@ -122,8 +143,8 @@ export const useAuthStore = create<AuthStore>()(
         isLoading: false,
         error: null,
         isInitialized: false,
-        isTokenExpired: false, // ✅ 新規追加
-        lastAuthError: null, // ✅ 新規追加
+        isTokenExpired: false,
+        lastAuthError: null,
 
         // 基本的な状態操作
         setUser: (user) =>
@@ -140,7 +161,7 @@ export const useAuthStore = create<AuthStore>()(
         setInitialized: (isInitialized) =>
           set({ isInitialized }, false, "setInitialized"),
 
-        // ✅ 新機能: 期限切れ状態管理
+        // ✅ 既存: 期限切れ状態管理
         setTokenExpired: (expired) =>
           set({ isTokenExpired: expired }, false, "setTokenExpired"),
 
@@ -156,20 +177,20 @@ export const useAuthStore = create<AuthStore>()(
           delete axios.defaults.headers.common["Authorization"];
         },
 
-        // ✅ 修正: 統一された認証エラーハンドリング
-        handleAuthError: (error) => {
+        // ✅ 修正: 型安全な認証エラーハンドリング
+        handleAuthError: (error: unknown) => {
           const { message, isTokenExpired, shouldLogout } =
             parseAuthError(error);
 
-          const { setError, setTokenExpired, setLastAuthError, logout } = get();
+          const { setError, setTokenExpired, setLastAuthError } = get();
 
-          // ✅ 重要: 先にエラー状態を設定してからログアウト
+          // ✅ エラー状態を設定してからログアウト
           setLastAuthError(message);
           setTokenExpired(isTokenExpired);
           setError(message);
 
           if (shouldLogout) {
-            // ✅ 修正: ログアウト処理（ユーザー情報とトークンのみクリア）
+            // ✅ ログアウト処理（ユーザー情報とトークンのみクリア）
             const { setUser, setToken, clearAuthHeader } = get();
             setUser(null);
             setToken(null);
@@ -181,7 +202,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
-        // ログイン処理
+        // ✅ 修正1: 型安全なログイン処理
         login: async (credentials) => {
           const {
             setLoading,
@@ -195,7 +216,7 @@ export const useAuthStore = create<AuthStore>()(
           try {
             setLoading(true);
             setError(null);
-            setTokenExpired(false); // ✅ 期限切れ状態をリセット
+            setTokenExpired(false);
 
             // FormDataでログインデータを送信（OAuth2PasswordRequestForm対応）
             const formData = new FormData();
@@ -218,23 +239,27 @@ export const useAuthStore = create<AuthStore>()(
             setToken(access_token);
             setAuthHeader(access_token);
             setUser(user);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("Login failed:", error);
 
-            if (error.response?.status === 401) {
+            // ✅ errorFormatterを使用した型安全なエラーハンドリング
+            const errorResult = formatAuthError(error);
+            logError(error, "authStore.login");
+
+            // 認証固有のエラーメッセージ
+            if (isAxiosError(error) && error.response?.status === 401) {
               setError("ユーザー名またはパスワードが間違っています");
-            } else if (error.response?.data?.detail) {
-              setError(error.response.data.detail);
             } else {
-              setError("ログインに失敗しました");
+              setError(errorResult.message);
             }
+
             throw error;
           } finally {
             setLoading(false);
           }
         },
 
-        // 新規登録処理
+        // ✅ 修正2: 型安全な新規登録処理
         register: async (userData) => {
           const {
             setLoading,
@@ -248,7 +273,7 @@ export const useAuthStore = create<AuthStore>()(
           try {
             setLoading(true);
             setError(null);
-            setTokenExpired(false); // ✅ 期限切れ状態をリセット
+            setTokenExpired(false);
 
             const response = await axios.post<AuthResponse>(
               `${API_BASE_URL}/auth/register`,
@@ -261,18 +286,36 @@ export const useAuthStore = create<AuthStore>()(
             setToken(access_token);
             setAuthHeader(access_token);
             setUser(user);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("Registration failed:", error);
 
-            if (error.response?.status === 400) {
-              setError(
-                "このユーザー名またはメールアドレスは既に使用されています"
-              );
-            } else if (error.response?.data?.detail) {
-              setError(error.response.data.detail);
+            // ✅ errorFormatterを使用した型安全なエラーハンドリング
+            const errorResult = formatAuthError(error);
+            logError(error, "authStore.register");
+
+            // 新規登録固有のエラーメッセージ
+            if (isAxiosError(error) && error.response?.status === 400) {
+              const data = error.response.data;
+
+              // より詳細なエラーメッセージの判定
+              if (data?.detail && typeof data.detail === "string") {
+                if (
+                  data.detail.includes("already exists") ||
+                  data.detail.includes("既に存在")
+                ) {
+                  setError(
+                    "このユーザー名またはメールアドレスは既に使用されています"
+                  );
+                } else {
+                  setError(data.detail);
+                }
+              } else {
+                setError("入力内容を確認してください");
+              }
             } else {
-              setError("アカウントの作成に失敗しました");
+              setError(errorResult.message);
             }
+
             throw error;
           } finally {
             setLoading(false);
@@ -280,25 +323,16 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         logout: () => {
-          const {
-            setUser,
-            setToken,
-            clearAuthHeader,
-            // ✅ 重要: ログアウト時は認証エラー状態をリセットしない
-            // setTokenExpired,
-            // setLastAuthError,
-          } = get();
+          const { setUser, setToken, clearAuthHeader } = get();
 
           setUser(null);
           setToken(null);
           clearAuthHeader();
 
           // ✅ 重要: 期限切れ状態は保持（UIで表示するため）
-          // setTokenExpired(false);
-          // setLastAuthError(null);
         },
 
-        // ✅ 修正: 現在のユーザー情報を取得（エラーハンドリング強化）
+        // ✅ 修正3: 型安全な現在ユーザー取得
         getCurrentUser: async () => {
           const { setLoading, token, handleAuthError } = get();
 
@@ -312,10 +346,10 @@ export const useAuthStore = create<AuthStore>()(
 
             const response = await axios.get<User>(`${API_BASE_URL}/auth/me`);
             get().setUser(response.data);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("Get current user failed:", error);
 
-            // ✅ 統一されたエラーハンドリングを使用
+            // ✅ 統一されたエラーハンドリングを使用（既に型安全）
             handleAuthError(error);
           } finally {
             setLoading(false);
@@ -355,19 +389,25 @@ export const useAuthStore = create<AuthStore>()(
   )
 );
 
-// authStore.ts の最下部のAxiosインターセプター部分
+// ✅ 修正4: 型安全なAxiosインターセプター
 if (typeof window !== "undefined") {
   axios.interceptors.response.use(
     (response) => response,
-    (error) => {
+    (error: unknown) => {
+      // unknown型に変更
 
       // 401エラーの場合は認証ストアで処理
-      if (error.response?.status === 401) {
+      if (isAxiosError(error) && error.response?.status === 401) {
         const authStore = useAuthStore.getState();
         const result = authStore.handleAuthError(error);
         console.log("✅ authStore.handleAuthError完了:", result);
       } else {
-        console.log("❌ 401以外のエラー:", error.response?.status);
+        // より詳細なログ出力
+        if (isAxiosError(error)) {
+          console.log("❌ 401以外のエラー:", error.response?.status);
+        } else {
+          console.log("❌ Axios以外のエラー:", error);
+        }
       }
 
       return Promise.reject(error);

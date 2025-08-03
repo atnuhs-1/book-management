@@ -1,7 +1,6 @@
 import os
 from datetime import date, timedelta
 from urllib.parse import urlencode
-import httpx
 
 import requests
 from app.core.auth import get_current_user
@@ -14,19 +13,12 @@ from app.schemas.food_item import (FoodItemCreate, FoodItemRead,
 from app.services.hybrid_recipe import hybrid_recipe_suggestion
 from app.services.recipe_chatgpt import \
     generate_recipe_focused_on_main_ingredient
-from app.services.validate_category import validate_food_category
+from app.services.validate_category import validate_food_category  # ✅ 追加
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-import os
-import requests
-from dotenv import load_dotenv
-from urllib.parse import urlencode
-from app.services.validate_category import validate_food_category  # ✅ 追加
 
 router = APIRouter(prefix="/api", tags=["food_items"])
-JANCODE_API_KEY = os.getenv("JANCODE_API_KEY")
-RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID")
 
 load_dotenv()  # 環境変数（.env）読み込み
 
@@ -345,8 +337,8 @@ def register_food_auto(
         expiration_date=date.today() + timedelta(days=30)
     )
 
-    return crud_food.create_food_item(db, current_user.id, food)
-
+    return crud_food.create_food_item(db, current_user.id, food)  
+  
 @router.get("/category-from-barcode", summary="JANコードから楽天カテゴリ名を取得")
 async def category_from_barcode(
     jan_code: str = Query(..., min_length=8, max_length=13)
@@ -443,4 +435,23 @@ async def category_from_barcode(
     return {
         "category": genre_name,
         "debug": debug
+
+@router.get("/foods/{food_id}/days_left", summary="賞味期限までの日数を取得")
+def get_days_until_expiration(
+    food_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    food = crud_food.get_food_item_by_id(db, food_id)
+
+    if not food or food.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="食材が見つかりません")
+
+    today = date.today()
+    days_left = (food.expiration_date - today).days
+
+    return {
+        "food_name": food.name,
+        "expiration_date": food.expiration_date,
+        "days_left": days_left
     }

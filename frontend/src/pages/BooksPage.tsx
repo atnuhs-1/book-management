@@ -11,6 +11,10 @@ import {
   GlassError,
   GlassEmptyState,
 } from "../components/ui/GlassUI";
+import type { Book } from "../types/book";
+
+type SortBy = "title" | "author" | "published_date" | "id";
+type SortOrder = "asc" | "desc";
 
 export const BooksPage = () => {
   const { books, isLoading, error, fetchBooks } = useBookStore();
@@ -19,10 +23,8 @@ export const BooksPage = () => {
   // ローカル検索状態
   const [searchQuery, setSearchQuery] = useState("");
   // ソート状態
-  const [sortBy, setSortBy] = useState<
-    "title" | "author" | "published_date" | "created_at"
-  >("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<SortBy>("id");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const loadBooks = useCallback(async () => {
     if (isAuthenticated && isInitialized) {
@@ -50,7 +52,7 @@ export const BooksPage = () => {
 
   // ソート処理
   const sortedBooks = [...filteredBooks].sort((a, b) => {
-    let aValue, bValue;
+    let aValue: string | number, bValue: string | number;
 
     switch (sortBy) {
       case "title":
@@ -65,10 +67,11 @@ export const BooksPage = () => {
         aValue = new Date(a.published_date || 0).getTime();
         bValue = new Date(b.published_date || 0).getTime();
         break;
-      case "created_at":
+      case "id":
       default:
-        aValue = new Date(a.created_at || 0).getTime();
-        bValue = new Date(b.created_at || 0).getTime();
+        // IDを登録順として使用（数値の大小で判定）
+        aValue = a.id;
+        bValue = b.id;
         break;
     }
 
@@ -80,7 +83,7 @@ export const BooksPage = () => {
   });
 
   // ジャンル推定関数
-  const getGenre = (book: any) => {
+  const getGenre = (book: Book) => {
     const title = book.title.toLowerCase();
     if (title.includes("巻") || title.includes("vol") || title.includes("第")) {
       return "漫画";
@@ -95,17 +98,6 @@ export const BooksPage = () => {
     } else {
       return "書籍";
     }
-  };
-
-  // ステータス推定関数
-  const getStatus = (book: any) => {
-    // 実際のプロジェクトではbook.statusなどの値を使用
-    // ここでは仮の実装
-    return Math.random() > 0.7
-      ? "読了"
-      : Math.random() > 0.5
-        ? "読書中"
-        : "積読";
   };
 
   // 未認証の場合の表示
@@ -166,7 +158,7 @@ export const BooksPage = () => {
           <span className="text-sm text-gray-600">並び替え:</span>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
             className="bg-white/30 backdrop-blur-xl border border-white/20 rounded-lg px-3 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
           >
             <option value="created_at">登録日</option>
@@ -231,7 +223,7 @@ export const BooksPage = () => {
                 />
 
                 {/* フォールバック画像 */}
-                <div className="hidden w-full h-64 flex items-center justify-center bg-gray-200/50">
+                <div className="hidden w-full h-64 items-center justify-center bg-gray-200/50">
                   <div className="text-center">
                     <div className="text-4xl mb-2 opacity-50">📖</div>
                     <p className="text-xs text-gray-500">カバー画像なし</p>
@@ -244,21 +236,6 @@ export const BooksPage = () => {
                 <div className="absolute top-2 right-2">
                   <div className="px-2 py-1 rounded-full text-xs font-medium bg-blue-400/80 text-white">
                     {getGenre(book)}
-                  </div>
-                </div>
-
-                {/* ステータスバッジ */}
-                <div className="absolute top-2 left-2">
-                  <div
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      getStatus(book) === "読了"
-                        ? "bg-green-400/80 text-white"
-                        : getStatus(book) === "読書中"
-                          ? "bg-yellow-400/80 text-white"
-                          : "bg-gray-400/80 text-white"
-                    }`}
-                  >
-                    {getStatus(book)}
                   </div>
                 </div>
               </div>
@@ -283,14 +260,6 @@ export const BooksPage = () => {
                     ISBN: {book.isbn}
                   </div>
                 )}
-
-                {/* 登録日 */}
-                <div className="text-xs text-gray-500">
-                  登録:{" "}
-                  {new Date(book.created_at || new Date()).toLocaleDateString(
-                    "ja-JP"
-                  )}
-                </div>
               </div>
             </div>
           ))}

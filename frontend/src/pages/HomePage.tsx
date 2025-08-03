@@ -4,6 +4,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useBookStore } from "../stores/bookStore";
 import { useAuthStore } from "../stores/authStore";
 import { GlassCard, GlassButton } from "../components/ui/GlassUI";
+import type { Food } from "../types/food";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const HomePage = () => {
   const { token } = useAuthStore();
@@ -19,7 +22,7 @@ export const HomePage = () => {
 
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]);  
+  }, [loadBooks]);
 
   const getStatus = (dateStr: string): "expired" | "expiring" | "fresh" => {
     const today = new Date();
@@ -40,14 +43,14 @@ export const HomePage = () => {
   const loadFoodStats = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch("http://localhost:8000/api/me/foods/", {
+      const res = await fetch(`${API_BASE_URL}/me/foods/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (!res.ok) throw new Error("食品データの取得に失敗");
-  
+
       const data = await res.json();
       const stats = {
         totalItems: data.length,
@@ -55,20 +58,20 @@ export const HomePage = () => {
         expiringSoon: 0,
         freshItems: 0,
       };
-  
-      data.forEach((item: any) => {
+
+      data.forEach((item: Food) => {
         const itemStatus = getStatus(item.expiration_date);
         if (itemStatus === "expired") stats.expired++;
         else if (itemStatus === "expiring") stats.expiringSoon++;
         else stats.freshItems++;
       });
-  
+
       setFoodStats(stats);
     } catch (err) {
       console.error(err);
     }
   }, [token]);
-  
+
   useEffect(() => {
     loadBooks();
     loadFoodStats();

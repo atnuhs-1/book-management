@@ -1,6 +1,13 @@
 // src/pages/ForgotPasswordPage.tsx
 import { useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+
+// APIエラーレスポンスの型定義
+interface ApiErrorResponse {
+  detail: string | Array<{ msg: string; type: string }>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
@@ -15,18 +22,37 @@ export const ForgotPasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      await axios.post("http://localhost:8000/api/auth/request-password-reset", {
+      await axios.post(`${API_BASE_URL}/auth/request-password-reset`, {
         email,
       });
       setMessage("パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。");
-    } catch (err: any) {
-      console.error(err);
-      const detail =
-        err.response?.data?.detail ||
-        (Array.isArray(err.response?.data?.detail) &&
-          err.response.data.detail[0]?.msg) ||
-        "メール送信に失敗しました。";
-      setError(detail);
+    } catch (error) {
+      console.error(error);
+
+      let errorMessage = "メール送信に失敗しました。";
+
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as
+          | ApiErrorResponse
+          | undefined;
+
+        if (responseData?.detail) {
+          if (typeof responseData.detail === "string") {
+            errorMessage = responseData.detail;
+          } else if (
+            Array.isArray(responseData.detail) &&
+            responseData.detail.length > 0
+          ) {
+            errorMessage = responseData.detail[0]?.msg || errorMessage;
+          }
+        } else if (error.message) {
+          errorMessage = `ネットワークエラー: ${error.message}`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

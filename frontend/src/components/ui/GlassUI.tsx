@@ -84,7 +84,6 @@ interface GlassButtonProps {
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   loading?: boolean;
-  type?: "button" | "submit" | "reset";
 }
 
 export const GlassButton: React.FC<GlassButtonProps> = ({
@@ -163,7 +162,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
   icon,
 }) => {
   return (
-    <div className={`space-y-1 bg-gray-100 rounded-lg${className}`}>
+    <div className={`space-y-1 bg-gray-100 rounded-lg ${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-white">
           {label}
@@ -247,11 +246,12 @@ export const GlassLoading: React.FC<{ message?: string }> = ({
 interface GlassErrorProps {
   message: string;
   onRetry?: () => void;
+  className?: string;
 }
 
-export const GlassError: React.FC<GlassErrorProps> = ({ message, onRetry }) => {
+export const GlassError: React.FC<GlassErrorProps> = ({ message, onRetry, className="" }) => {
   return (
-    <GlassCard className="p-6">
+    <GlassCard className={`p-6 ${className}`}>
       <div className="flex items-center">
         <span className="text-red-400 mr-2 text-xl">❌</span>
         <div className="flex-1">

@@ -46,6 +46,7 @@ export interface FoodCreate {
   expiration_date: string;
   barcode?: string;
   barcode_type?: "JAN" | "EAN";
+  force?: boolean;
   // user_id は自動設定されるため不要
 }
 
