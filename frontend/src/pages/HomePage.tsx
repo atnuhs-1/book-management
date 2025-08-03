@@ -260,7 +260,7 @@ export const HomePage = () => {
                 </GlassButton>
               </Link>
               <Link to="/add-food">
-                <GlassButton variant="secondary" size="lg" className="w-full">
+                <GlassButton variant="primary" size="lg" className="w-full">
                   🍎 食品を追加
                 </GlassButton>
               </Link>
