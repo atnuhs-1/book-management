@@ -89,11 +89,18 @@ export const LoginPage = () => {
       <div className="max-w-md w-full space-y-8">
         {/* ヘッダー */}
         <div className="text-center">
-          <Link to="/" className="inline-block">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              📚 Book Management PWA
-            </h1>
-          </Link>
+        <Link to="/" className="inline-block">
+        <div className="flex items-center justify-center space-x-3 mb-2">
+          <img
+            src="/icon-512x512.jpg"
+            alt="LibrEats Logo"
+            className="w-10 h-10 rounded-md"
+          />
+          <h1 className="text-3xl font-bold text-gray-900">
+            LibrEats
+          </h1>
+        </div>
+    </Link>
           <h2 className="text-xl text-gray-600">ログイン</h2>
           <p className="mt-2 text-sm text-gray-500">
             アカウントにログインして書籍管理を始めましょう
