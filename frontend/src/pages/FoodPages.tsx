@@ -43,6 +43,8 @@ export const FoodPage = () => {
   const [forceEditConfirmVisible, setForceEditConfirmVisible] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState("");
   const [sortOrder, setSortOrder] = useState("created_at");
+  const [usingItem, setUsingItem] = useState<Food | null>(null);
+  const [usedQuantity, setUsedQuantity] = useState<number>(1);
 
   useEffect(() => {
     const fetchFoods = async () => {
@@ -86,6 +88,40 @@ export const FoodPage = () => {
       fetchAllDaysLeft();
     }
   }, [foodItems, token]);
+
+  const handleUse = (item: Food) => {
+    setUsingItem(item);
+    setUsedQuantity(1);
+  };
+
+  const confirmUse = async () => {
+    if (!usingItem || !token) return;
+    try {
+      const res = await fetchWithAuth(getApiUrl(`/api/foods/${usingItem.id}/use`), token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ used_quantity: usedQuantity }),
+      });
+
+      if (!res.ok) throw new Error("使用に失敗しました");
+
+      const updatedItems = foodItems.map((item) => {
+        if (item.id === usingItem.id) {
+          const newQuantity = item.quantity - usedQuantity;
+          return { ...item, quantity: newQuantity > 0 ? newQuantity : 0 };
+        }
+        return item;
+      });
+
+      setFoodItems(updatedItems);
+      setUsingItem(null);
+      alert("✅ 使用処理が完了しました");
+    } catch (err) {
+      console.error("❌ 使用エラー:", err);
+      alert("使用に失敗しました");
+    }
+  };
+
 
   const handleEdit = (item: Food) => {
     setEditingItem(item);
@@ -286,10 +322,9 @@ export const FoodPage = () => {
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => handleEdit(item)}
-                className="px-3 py-1 text-sm rounded text-white bg-blue-500 hover:bg-blue-600 transition"
-              >
-                編集
+                onClick={() => handleUse(item)}
+                className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">
+                🍳 料理する
               </button>
               <button
                 onClick={() => handleDelete(item.id)}
@@ -396,6 +431,28 @@ export const FoodPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {usingItem && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm">
+                  <h2 className="text-lg font-semibold mb-4">
+                    {usingItem.name} を料理する（{usingItem.unit}）
+                  </h2>
+                  <input
+                    type="number"
+                    value={usedQuantity}
+                    min={1}
+                    max={usingItem.quantity}
+                    onChange={(e) => setUsedQuantity(Number(e.target.value))}
+                    className="w-full mb-4 px-3 py-2 border rounded"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setUsingItem(null)} className="px-4 py-2 bg-gray-200 rounded">キャンセル</button>
+                    <button onClick={confirmUse} className="px-4 py-2 bg-green-500 text-white rounded">使用</button>
+                  </div>
+                </div>
+              </div>
       )}
 
       {forceEditConfirmVisible && (
