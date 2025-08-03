@@ -436,6 +436,7 @@ export const formatFoodError = (error: unknown): FoodErrorResult => {
 
       case 409:
         // ✅ カテゴリ不一致の確認メッセージかどうかを判定
+        // eslint-disable-next-line no-case-declarations
         const detail = data?.detail || "";
         console.log("🔍 409エラー detail:", detail); // ← これを追加
         console.log("🔍 detail type:", typeof detail); // ← これを追加
