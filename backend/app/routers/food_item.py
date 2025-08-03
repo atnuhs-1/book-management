@@ -111,15 +111,36 @@ def preview_food_info(
 
 
 # ✅ 2. GET /api/foods/lookup_name → 商品名だけ取得
-@router.get("/foods/lookup_name", summary="JANコードから商品名だけ取得")
+@router.get("/foods/lookup_name", summary="JANコードから商品名と単品容量を取得")
 def lookup_food_name(
     barcode: str = Query(..., min_length=8, max_length=13)
 ):
     item, full_url = fetch_jancode_product(barcode)
+    details = item.get("ProductDetails", {})
+
+    name = item.get("itemName", "名称不明")
+
+    # ✅ 単品容量から数量と単位を抽出
+    quantity = None
+    unit = None
+    try:
+        raw = details.get("単品容量", "")  # ← ここを"内容量"から修正
+        raw_lower = raw.lower().strip()
+        if "ml" in raw_lower:
+            quantity = int(raw_lower.replace("ml", "").strip())
+            unit = "ml"
+        elif "g" in raw_lower:
+            quantity = int(raw_lower.replace("g", "").strip())
+            unit = "g"
+    except Exception:
+        quantity = None
+        unit = None
+
     return {
-        "item_name": item.get("itemName", "名称不明"),
-        "requested_url": full_url
+        "name": name,
+        "quantity": quantity,
     }
+
 
 
 # ✅ POST /api/foods
