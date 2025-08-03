@@ -396,10 +396,16 @@ export const formatAuthError = (error: unknown): FormattedError => {
   return baseResult;
 };
 
+export interface FoodErrorResult extends FormattedError {
+  needsConfirmation?: boolean; // 確認が必要かどうか
+  confirmationMessage?: string; // 確認メッセージ
+  canForce?: boolean; // 強行登録可能かどうか
+}
+
 /**
  * 🍎 食品管理用のカスタムエラーフォーマッター（将来実装）
  */
-export const formatFoodError = (error: unknown): FormattedError => {
+export const formatFoodError = (error: unknown): FoodErrorResult => {
   const baseResult = formatErrorMessage(error);
 
   // 食品固有のエラー処理
@@ -429,14 +435,40 @@ export const formatFoodError = (error: unknown): FormattedError => {
         };
 
       case 409:
+        // ✅ カテゴリ不一致の確認メッセージかどうかを判定
+        const detail = data?.detail || "";
+        console.log("🔍 409エラー detail:", detail); // ← これを追加
+        console.log("🔍 detail type:", typeof detail); // ← これを追加
+        console.log("🔍 includes test:", detail.includes("分類されませんが")); // ← これを追加
+
+        if (
+          typeof detail === "string" &&
+          detail.includes("分類されませんが、本当に追加してよろしいですか")
+        ) {
+          return {
+            ...baseResult,
+            message: detail,
+            needsConfirmation: true, // ✅ 確認が必要
+            confirmationMessage: detail, // ✅ 確認メッセージ
+            canForce: true, // ✅ 強行登録可能
+          };
+        }
+
+        // その他の409エラー（通常の重複など）
         return {
           ...baseResult,
           message: "この食品は既に登録されています",
+          needsConfirmation: false,
+          canForce: false,
         };
     }
   }
 
-  return baseResult;
+  return {
+    ...baseResult,
+    needsConfirmation: false,
+    canForce: false,
+  };
 };
 
 /**
